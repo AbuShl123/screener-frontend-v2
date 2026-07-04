@@ -5,6 +5,12 @@ import { TickerStrip } from '../TickerStrip';
 interface SplitAuthLayoutProps {
   children: ReactNode;
   showTicker?: boolean;
+  /**
+   * Replaces the centered middle content of the left marketing panel (the
+   * `BrandMark` at top and `TickerStrip` at bottom stay structural). When omitted,
+   * the default login/2a content below renders — so no-arg callers are unchanged.
+   */
+  marketing?: ReactNode;
 }
 
 const ASKS = [
@@ -22,13 +28,29 @@ const BIDS = [
 export function SplitAuthLayout({
   children,
   showTicker = false,
+  marketing,
 }: SplitAuthLayoutProps) {
   return (
     <div className="flex min-h-screen bg-surface">
       <div className="flex flex-[1.2] flex-col justify-between border-r border-border-subtle bg-surface-marketing px-16 pt-11">
         <BrandMark />
         <div className="flex flex-1 flex-col justify-center gap-8">
-          <div className="flex flex-col gap-[14px]">
+          {marketing ?? <DefaultMarketing />}
+        </div>
+        <TickerStrip show={showTicker} />
+      </div>
+      <div className="flex flex-1 items-center justify-center px-8">
+        <div className="w-[400px]">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** The default (login/2a) left-panel content: headline + subtext + order-book preview card. */
+function DefaultMarketing() {
+  return (
+    <>
+      <div className="flex flex-col gap-[14px]">
             <h2 className="max-w-[580px] font-sans text-[38px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
               Every level that matters, in real time.
             </h2>
@@ -90,12 +112,6 @@ export function SplitAuthLayout({
               ),
             )}
           </div>
-        </div>
-        <TickerStrip show={showTicker} />
-      </div>
-      <div className="flex flex-1 items-center justify-center px-8">
-        <div className="w-[400px]">{children}</div>
-      </div>
-    </div>
+    </>
   );
 }

@@ -1,8 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Button } from '@/components/Button';
-import { TextField } from '@/components/TextField';
 import { CenteredAuthLayout } from '@/components/layouts/CenteredAuthLayout';
-import { SplitAuthLayout } from '@/components/layouts/SplitAuthLayout';
+import { CheckInboxPage, RegisterPage } from '@/features/auth';
 
 /**
  * Application shell. Feature routes get mounted here as they are built
@@ -13,36 +12,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Placeholder />} />
-      <Route path="/dev/split-preview" element={<SplitPreview />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register/check-inbox" element={<CheckInboxPage />} />
       <Route path="/dev/centered-preview" element={<CenteredPreview />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  );
-}
-
-function SplitPreview() {
-  return (
-    <SplitAuthLayout>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-[26px] font-semibold tracking-[-0.01em] text-text">Sign in</h1>
-          <p className="text-[14px] leading-[1.55] text-text-secondary">
-            Welcome back. Your books are still running.
-          </p>
-        </div>
-        <div className="flex flex-col gap-[18px]">
-          <TextField label="Email" type="email" name="email" placeholder="ada@example.com" />
-          <TextField label="Password" type="password" name="password" placeholder="••••••••••••" />
-        </div>
-        <Button variant="primary">Sign in</Button>
-        <p className="text-center text-[14px] text-text-secondary">
-          New to Screener?{' '}
-          <a href="/dev/centered-preview" className="font-medium text-accent no-underline">
-            Create an account
-          </a>
-        </p>
-      </div>
-    </SplitAuthLayout>
   );
 }
 
@@ -75,7 +49,7 @@ function CenteredPreview() {
           </Button>
           <span className="font-mono text-[11px] text-text-dim">resend available once per 60 s</span>
         </div>
-        <a href="/dev/split-preview" className="text-[14px] text-text-secondary no-underline">
+        <a href="/register" className="text-[14px] text-text-secondary no-underline">
           Back to sign in
         </a>
       </div>

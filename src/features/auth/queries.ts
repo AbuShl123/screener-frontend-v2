@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import * as api from './api';
 import { authKeys, fetchMe, useSession } from './session';
+import type { RegisterRequest, ResendRequest } from './schemas';
 
 /**
  * React Query ownership of the `/me` profile. Per CLAUDE.md's data-flow table
@@ -19,5 +21,27 @@ export function useMe() {
     queryFn: fetchMe, // handles refresh-on-401 internally via withAuth
     enabled: status === 'authenticated', // stay idle until tokens exist
     staleTime: 60_000,
+  });
+}
+
+/**
+ * Register mutation (POST /register → 202 { status, email }). Thin wrapper so the
+ * page gets `isPending`/`error` (an `ApiError` — branch on `.status` for the 409/400
+ * banner) for free. No cache writes: register issues no tokens and doesn't feed /me.
+ */
+export function useRegister() {
+  return useMutation({
+    mutationFn: (body: RegisterRequest) => api.register(body),
+  });
+}
+
+/**
+ * Resend-verification mutation (POST /resend-verification → always 202 generic).
+ * Success just means "request accepted" — deliberately no enumeration, so callers
+ * show a generic confirmation. No cache writes.
+ */
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: (body: ResendRequest) => api.resendVerification(body),
   });
 }
