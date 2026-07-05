@@ -29,3 +29,17 @@ export const resendFormSchema = z.object({
 });
 
 export type ResendFormValues = z.infer<typeof resendFormSchema>;
+
+/**
+ * Client-side login form schema (RHF + Zod). Same `z.email()` format guard as the
+ * other schemas, but the password is `min(1)` "required" only — deliberately NO
+ * 8-char floor. Register's length rule is a creation-time UX guard; login must accept
+ * whatever password the account already has, and the backend enforces no length. Any
+ * real credential problem surfaces as the server's 401, not a client-side rule.
+ */
+export const loginFormSchema = z.object({
+  email: z.email('Enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export type LoginFormValues = z.infer<typeof loginFormSchema>;

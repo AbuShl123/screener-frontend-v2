@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as api from './api';
-import { authKeys, fetchMe, useSession } from './session';
-import type { RegisterRequest, ResendRequest, VerifyEmailRequest } from './schemas';
+import { authKeys, fetchMe, loginAndStore, useSession } from './session';
+import type { LoginRequest, RegisterRequest, ResendRequest, VerifyEmailRequest } from './schemas';
 
 /**
  * React Query ownership of the `/me` profile. Per CLAUDE.md's data-flow table
@@ -21,6 +21,19 @@ export function useMe() {
     queryFn: fetchMe, // handles refresh-on-401 internally via withAuth
     enabled: status === 'authenticated', // stay idle until tokens exist
     staleTime: 60_000,
+  });
+}
+
+/**
+ * Login mutation (POST /login → 200 token pair). Wraps `loginAndStore`, which persists
+ * the tokens + arms proactive refresh; this hook exists so the page gets `isPending`
+ * (button) and a rejecting `mutateAsync` (the 3a/3b/3c error branch). No cache writes
+ * here — /me hydrates on its own once the session flips to authenticated (see useMe).
+ * A rejected promise is an `ApiError`: 401 invalid/disabled, 403 unverified.
+ */
+export function useLogin() {
+  return useMutation({
+    mutationFn: (body: LoginRequest) => loginAndStore(body),
   });
 }
 

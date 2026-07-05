@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { CheckInboxPage, RegisterPage, VerifyEmailPage } from '@/features/auth';
+import { CheckInboxPage, LoginPage, RegisterPage, VerifyEmailPage } from '@/features/auth';
 
 /**
  * Application shell. Feature routes get mounted here as they are built
@@ -10,6 +10,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Placeholder />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/register/check-inbox" element={<CheckInboxPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
