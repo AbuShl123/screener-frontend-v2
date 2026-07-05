@@ -17,3 +17,15 @@ export const registerFormSchema = z.object({
 });
 
 export type RegisterFormValues = z.infer<typeof registerFormSchema>;
+
+/**
+ * Single-field resend form for the verify-email 3g screen. On `expired`/`invalid`
+ * (and the no-token case) the verify endpoint never received an email, so the user
+ * must type one — same `z.email()` format guard as register's email field, so an
+ * obviously-junk value is caught inline before the (always-202) resend fires.
+ */
+export const resendFormSchema = z.object({
+  email: z.email('Enter a valid email'),
+});
+
+export type ResendFormValues = z.infer<typeof resendFormSchema>;

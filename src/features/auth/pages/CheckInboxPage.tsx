@@ -1,6 +1,7 @@
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/Button';
 import { CenteredAuthLayout } from '@/components/layouts/CenteredAuthLayout';
+import { AuthBadge } from '../components/AuthBadge';
 import { useResendVerification } from '../queries';
 import { useCooldown } from '../hooks/useCooldown';
 
@@ -37,15 +38,7 @@ export function CheckInboxPage() {
   return (
     <CenteredAuthLayout>
       <div className="flex flex-col items-center gap-6 text-center">
-        <div
-          className="flex h-[60px] w-[60px] items-center justify-center rounded-full font-mono text-[23px] text-accent"
-          style={{
-            border: '1px solid color-mix(in oklab, var(--color-accent) 45%, transparent)',
-            background: 'color-mix(in oklab, var(--color-accent) 10%, transparent)',
-          }}
-        >
-          @
-        </div>
+        <AuthBadge className="text-[23px]">@</AuthBadge>
 
         <div className="flex flex-col gap-[10px]">
           <h1 className="text-[28px] font-semibold tracking-[-0.01em] text-text">
