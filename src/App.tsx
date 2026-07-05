@@ -1,29 +1,51 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { CheckInboxPage, LoginPage, RegisterPage, VerifyEmailPage } from '@/features/auth';
+import { SessionGate } from '@/app/SessionGate';
+import { ProtectedRoute } from '@/app/ProtectedRoute';
+import { PublicRoute } from '@/app/PublicRoute';
+import { HomePage } from '@/app/HomePage';
 
 /**
- * Application shell. Feature routes get mounted here as they are built
- * (auth, order book, rules, billing). For now it is an intentionally empty
- * foundation with a single placeholder route.
+ * Application shell. `SessionGate` gates the whole app on reload with a blocking
+ * bootstrap splash while `/me` re-validates rehydrated tokens. Route guards enforce
+ * auth-only policy: `ProtectedRoute` for the app, `PublicRoute` to bounce an
+ * authenticated user off /login and /register. /verify-email and /register/check-inbox
+ * stay reachable in any auth state (locked decision 3).
  */
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Placeholder />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/register/check-inbox" element={<CheckInboxPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-
-function Placeholder() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-neutral-950 text-neutral-100">
-      <h1 className="text-2xl font-semibold tracking-tight">Screener</h1>
-      <p className="text-sm text-neutral-400">Foundation is up. No features yet.</p>
-    </div>
+    <SessionGate>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
+            </PublicRoute>
+          }
+        />
+        {/* Unguarded in any auth state (locked decision 3): a logged-in user may still
+            click a verify link or land on check-inbox. */}
+        <Route path="/register/check-inbox" element={<CheckInboxPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </SessionGate>
   );
 }
