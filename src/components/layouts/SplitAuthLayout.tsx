@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { BrandMark } from '../BrandMark';
 import { TickerStrip } from '../TickerStrip';
 
@@ -33,7 +34,13 @@ export function SplitAuthLayout({
   return (
     <div className="flex min-h-screen bg-surface">
       <div className="flex flex-[1.2] flex-col justify-between border-r border-border-subtle bg-surface-marketing px-16 pt-11">
-        <BrandMark />
+        <Link
+          to="/"
+          aria-label="Screener home"
+          className="w-fit transition-opacity duration-150 hover:opacity-80"
+        >
+          <BrandMark />
+        </Link>
         <div className="flex flex-1 flex-col justify-center gap-8">
           {marketing ?? <DefaultMarketing />}
         </div>
