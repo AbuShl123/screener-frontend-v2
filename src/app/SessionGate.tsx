@@ -18,8 +18,8 @@ export function SessionGate({ children }: { children: ReactNode }) {
   // - anonymous            → status !== 'authenticated' → false (render routes; guards handle it)
   // - /me resolved (200)   → isLoading false            → false (render routes)
   // - hard auth failure    → withAuth hardLogout flips status to 'anonymous' → false
-  // - non-auth error (5xx / network down) → isLoading false → false (render; HomePage shows a
-  //   retry fallback — we do NOT log the user out on a transient error; tokens are still valid)
+  // - non-auth error (5xx / network down) → isLoading false → false (render; the dashboard does
+  //   NOT block on /me — we do NOT log the user out on a transient error; tokens are still valid)
   const bootstrapping = status === 'authenticated' && me.isLoading;
 
   if (bootstrapping) return <BootSplash />;

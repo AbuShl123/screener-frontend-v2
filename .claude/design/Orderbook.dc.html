@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/tokens/base.css">
+  <link rel="stylesheet" href="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/styles.css">
+  <script src="_ds/screener-9a78573a-150b-4a39-a7b4-eb3c1671c4dd/_ds_bundle.js"></script>
+</helmet>
+
+<div style="width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--color-border-subtle);">
+    <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: {{ marketColor }}; border: 1px solid {{ marketBorder }}; border-radius: 4px; padding: 1px 5px;">{{ marketLabel }}</span>
+    <span style="font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; color: var(--color-text);">{{ symbol }}</span>
+    <span style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+      <span style="width: 6px; height: 6px; border-radius: 999px; background: {{ liveDot }};"></span>
+      <sc-if value="{{ showMidPrice }}" hint-placeholder-val="{{ true }}">
+      <span style="font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); text-align: right;">{{ midPrice }}</span>
+      </sc-if>
+    </span>
+  </div>
+
+  <!-- Variant 1a: full-row wash, no tier edge -->
+  <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}">
+  <div style="padding: 8px 0 12px;">
+    <sc-if value="{{ showHeaders }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: 72px 1fr 56px; gap: 12px; padding: 4px 16px 8px;">
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim);">PRICE</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">{{ notionalLabel }}</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">DIST</span>
+    </div>
+    </sc-if>
+    <sc-for list="{{ asksA }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: stretch; padding: 0 16px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <span style="position: relative; display: flex; align-items: center; padding: 4px 0; font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }};">{{ row.price }}</span>
+        <div style="position: relative; display: grid; grid-template-columns: 1fr 56px; gap: 12px; align-items: center;">
+          <div style="position: absolute; top: 0; bottom: 0; right: 0; width: {{ row.barW }}; background: {{ row.barBg }}; transition: width 120ms linear, background-color 120ms linear;"></div>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong); text-align: right;">{{ row.notional }}</span>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+        </div>
+      </div>
+    </sc-for>
+    <div style="border-top: 1px dashed var(--color-border-subtle); margin: 7px 16px;"></div>
+    <sc-for list="{{ bidsA }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: stretch; padding: 0 16px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <span style="position: relative; display: flex; align-items: center; padding: 4px 0; font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }};">{{ row.price }}</span>
+        <div style="position: relative; display: grid; grid-template-columns: 1fr 56px; gap: 12px; align-items: center;">
+          <div style="position: absolute; top: 0; bottom: 0; right: 0; width: {{ row.barW }}; background: {{ row.barBg }}; transition: width 120ms linear, background-color 120ms linear;"></div>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong); text-align: right;">{{ row.notional }}</span>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- Variant 1b: slim tier-bar column -->
+  <sc-if value="{{ isB }}" hint-placeholder-val="{{ true }}">
+  <div style="padding: 8px 10px 12px;">
+    <sc-if value="{{ showHeaders }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: 72px 1fr 52px 64px; gap: 12px; padding: 4px 6px 8px;">
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim);">PRICE</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">{{ notionalLabel }}</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">DIST</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim);">TIER</span>
+    </div>
+    </sc-if>
+    <sc-for list="{{ asksB }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 72px 1fr 52px 64px; gap: 12px; align-items: center; padding: 3px 6px; border-radius: 4px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <span style="font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }};">{{ row.price }}</span>
+        <span style="font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong); text-align: right;">{{ row.notional }}</span>
+        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+        <div style="position: relative; height: 8px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden;">
+          <div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{ row.barW }}; background: {{ row.barBg }}; border-radius: 2px; transition: width 120ms linear, background-color 120ms linear;"></div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="border-top: 1px dashed var(--color-border-subtle); margin: 7px 6px;"></div>
+    <sc-for list="{{ bidsB }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 72px 1fr 52px 64px; gap: 12px; align-items: center; padding: 3px 6px; border-radius: 4px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <span style="font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }};">{{ row.price }}</span>
+        <span style="font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong); text-align: right;">{{ row.notional }}</span>
+        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+        <div style="position: relative; height: 8px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden;">
+          <div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{ row.barW }}; background: {{ row.barBg }}; border-radius: 2px; transition: width 120ms linear, background-color 120ms linear;"></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- Variant 1c: full-row wash + tier edge -->
+  <sc-if value="{{ isC }}" hint-placeholder-val="{{ true }}">
+  <div style="padding: 8px 0 12px;">
+    <sc-if value="{{ showHeaders }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: 72px 1fr 56px; gap: 12px; padding: 4px 16px 8px;">
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim);">PRICE</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">{{ notionalLabel }}</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">DIST</span>
+    </div>
+    </sc-if>
+    <sc-for list="{{ asksC }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: stretch; padding: 0 16px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <span style="position: relative; display: flex; align-items: center; padding: 4px 0; font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }};">{{ row.price }}</span>
+        <div style="position: relative; display: grid; grid-template-columns: 1fr 56px; gap: 12px; align-items: center;">
+          <div style="position: absolute; top: 0; bottom: 0; right: 0; width: {{ row.barW }}; background: {{ row.barBg }}; border-left: 2px solid {{ row.edge }}; transition: width 120ms linear, background-color 120ms linear;"></div>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong); text-align: right;">{{ row.notional }}</span>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+        </div>
+      </div>
+    </sc-for>
+    <div style="border-top: 1px dashed var(--color-border-subtle); margin: 7px 16px;"></div>
+    <sc-for list="{{ bidsC }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: stretch; padding: 0 16px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <span style="position: relative; display: flex; align-items: center; padding: 4px 0; font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }};">{{ row.price }}</span>
+        <div style="position: relative; display: grid; grid-template-columns: 1fr 56px; gap: 12px; align-items: center;">
+          <div style="position: absolute; top: 0; bottom: 0; right: 0; width: {{ row.barW }}; background: {{ row.barBg }}; border-left: 2px solid {{ row.edge }}; transition: width 120ms linear, background-color 120ms linear;"></div>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong); text-align: right;">{{ row.notional }}</span>
+          <span style="position: relative; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- Variant 1d: notional / price / dist, left-anchored histogram -->
+  <sc-if value="{{ isD }}" hint-placeholder-val="{{ true }}">
+  <div style="padding: 8px 0 12px;">
+    <sc-if value="{{ showHeaders }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: 1fr 72px 56px; gap: 12px; padding: 4px 16px 8px;">
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim);">{{ notionalLabel }}</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">PRICE</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--color-text-dim); text-align: right;">DIST</span>
+    </div>
+    </sc-if>
+    <sc-for list="{{ asksD }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 1fr 72px 56px; gap: 12px; align-items: center; padding: 4px 16px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <div style="position: absolute; top: 0; bottom: 0; left: 0; right: 156px;"><div style="position: absolute; top: 0; bottom: 0; left: 0; width: {{ row.barW }}; background: {{ row.barBg }}; transition: width 120ms linear, background-color 120ms linear;"></div></div>
+        <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong);">{{ row.notional }}</span>
+        <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }}; text-align: right;">{{ row.price }}</span>
+        <span style="position: relative; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+      </div>
+    </sc-for>
+    <div style="border-top: 1px dashed var(--color-border-subtle); margin: 7px 16px;"></div>
+    <sc-for list="{{ bidsD }}" as="row" hint-placeholder-count="5">
+      <div style="position: relative; display: grid; grid-template-columns: 1fr 72px 56px; gap: 12px; align-items: center; padding: 4px 16px;" style-hover="background: rgba(255,255,255,0.04)" title="{{ row.tooltip }}">
+        <div style="position: absolute; top: 0; bottom: 0; left: 0; right: 156px;"><div style="position: absolute; top: 0; bottom: 0; left: 0; width: {{ row.barW }}; background: {{ row.barBg }}; transition: width 120ms linear, background-color 120ms linear;"></div></div>
+        <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-strong);">{{ row.notional }}</span>
+        <span style="position: relative; font-family: var(--font-mono); font-size: 12px; color: {{ row.priceColor }}; text-align: right;">{{ row.price }}</span>
+        <span style="position: relative; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: right;">{{ row.dist }}</span>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:372,&quot;height&quot;:420},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1a&quot;,&quot;1b&quot;,&quot;1c&quot;,&quot;1d&quot;],&quot;default&quot;:&quot;1c&quot;,&quot;tsType&quot;:&quot;'1a' | '1b' | '1c' | '1d'&quot;},&quot;notional&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dollars&quot;,&quot;qty&quot;],&quot;default&quot;:&quot;dollars&quot;,&quot;tsType&quot;:&quot;'dollars' | 'qty'&quot;},&quot;tier0&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hidden&quot;,&quot;faint&quot;],&quot;default&quot;:&quot;faint&quot;,&quot;tsType&quot;:&quot;'hidden' | 'faint'&quot;},&quot;tier1&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#3edc97&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Tier colors&quot;},&quot;tier2&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#fedc01&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Tier colors&quot;},&quot;tier3&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#f26d6d&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Tier colors&quot;},&quot;tier4&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#9e73e8&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Tier colors&quot;},&quot;fillOpacity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:5,&quot;min&quot;:0,&quot;max&quot;:100,&quot;step&quot;:1,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Tier colors&quot;},&quot;symbol&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;XRPUSDT&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;market&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;FUT&quot;,&quot;SPOT&quot;],&quot;default&quot;:&quot;FUT&quot;,&quot;tsType&quot;:&quot;'FUT' | 'SPOT'&quot;},&quot;basePrice&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:1.1372,&quot;tsType&quot;:&quot;number&quot;},&quot;live&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showColumnHeaders&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showMidPrice&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { book: this.makeBook(), tick: 0 };
+    this.timer = null;
+  }
+
+  seed() {
+    const s = (this.props.symbol || 'XRPUSDT') + (this.props.market || 'FUT');
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  rng() {
+    this._s = (this._s + 0x6D2B79F5) >>> 0;
+    let t = this._s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  makeBook() {
+    this._s = this.seed();
+    const base = this.props.basePrice ?? 1.1372;
+    const now = Date.now();
+    const askD = [0.02076, 0.01591, 0.01195, 0.00613, 0.00260];
+    const bidD = [0.00269, 0.00339, 0.00551, 0.01600, 0.02138];
+    const tierPool = [0, 0, 1, 2, 3, 4];
+    const mk = (sign, d) => {
+      const price = base * (1 + sign * d);
+      const target = 180000 + this.rng() * 1450000;
+      const q = target / price;
+      const tier = tierPool[Math.floor(this.rng() * tierPool.length)];
+      return { price, q, baseQ: q, tier, distance: d, seen: now - Math.floor(this.rng() * 3.2 * 864e5) };
+    };
+    return {
+      asks: askD.map((d) => mk(1, d)),
+      bids: bidD.map((d) => mk(-1, d)),
+    };
+  }
+
+  componentDidMount() { this.syncTimer(); }
+  componentDidUpdate(prev) {
+    if (prev.symbol !== this.props.symbol || prev.basePrice !== this.props.basePrice) {
+      this.setState({ book: this.makeBook() });
+    }
+    this.syncTimer();
+  }
+  componentWillUnmount() { if (this.timer) clearInterval(this.timer); }
+
+  syncTimer() {
+    const live = this.props.live ?? true;
+    if (live && !this.timer) {
+      this.timer = setInterval(() => this.tickUpdate(), 180);
+    } else if (!live && this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  tickUpdate() {
+    this.setState((s) => {
+      const book = {
+        asks: s.book.asks.map((o) => ({ ...o })),
+        bids: s.book.bids.map((o) => ({ ...o })),
+      };
+      const all = book.asks.concat(book.bids);
+      for (let i = 0; i < 2; i++) {
+        const o = all[Math.floor(Math.random() * all.length)];
+        const f = 1 + (Math.random() - 0.5) * 0.06;
+        o.q = Math.min(o.baseQ * 1.6, Math.max(o.baseQ * 0.5, o.q * f));
+        o.distance = Math.max(0.0004, o.distance * (1 + (Math.random() - 0.5) * 0.015));
+      }
+      if (Math.random() < 0.02) {
+        const o = all[Math.floor(Math.random() * all.length)];
+        o.tier = Math.max(0, Math.min(4, o.tier + (Math.random() < 0.5 ? -1 : 1)));
+      }
+      return { book, tick: s.tick + 1 };
+    });
+  }
+
+  priceDecimals(base) {
+    if (base >= 1000) return 2;
+    if (base >= 100) return 3;
+    if (base >= 1) return 4;
+    return 5;
+  }
+  fmtMoney(v) {
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+    return '$' + v.toFixed(0);
+  }
+  fmtQty(q) {
+    if (q >= 1e6) return (q / 1e6).toFixed(2) + 'M';
+    if (q >= 1e3) return (q / 1e3).toFixed(1) + 'K';
+    return q.toFixed(0);
+  }
+  fmtAge(ms) {
+    const s = Math.max(1, Math.floor(ms / 1000));
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d) return d + 'd ' + h + 'h';
+    if (h) return h + 'h ' + m + 'm';
+    if (m) return m + 'm';
+    return s + 's';
+  }
+
+  renderVals() {
+    const variant = this.props.variant ?? '1a';
+    const isA = variant === '1a', isB = variant === '1b', isC = variant === '1c', isD = variant === '1d';
+    const base = this.props.basePrice ?? 1.1372;
+    const dec = this.priceDecimals(base);
+    const t1 = this.props.tier1 ?? '#3edc97';
+    const t2 = this.props.tier2 ?? '#f5b84d';
+    const t3 = this.props.tier3 ?? '#f26d6d';
+    const t4 = this.props.tier4 ?? '#b48cf7';
+    const TIER = [null, t1, t2, t3, t4];
+    const intensity = Math.max(0, Math.min(100, this.props.fillOpacity ?? 40));
+    const edgeAlpha = Math.min(100, intensity + 45);
+    const notionalMode = this.props.notional ?? 'dollars';
+    const showHeaders = this.props.showColumnHeaders ?? true;
+    const tier0Faint = (this.props.tier0 ?? 'hidden') === 'faint';
+    const t0bg = tier0Faint ? (isB ? 'rgba(255,255,255,0.12)' : isC ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)') : 'transparent';
+    const t0edge = tier0Faint ? 'rgba(255,255,255,0.25)' : 'transparent';
+    const { book } = this.state;
+    const now = Date.now();
+
+    const all = book.asks.concat(book.bids);
+    const maxNotional = Math.max(...all.map((o) => o.price * o.q));
+    const bg = (c) => `color-mix(in oklab, ${c} ${intensity}%, transparent)`;
+    const edge = (c) => `color-mix(in oklab, ${c} ${edgeAlpha}%, transparent)`;
+
+    const makeRows = (list, side) => list.map((o, i) => {
+      const notionalVal = o.price * o.q;
+      const pct = Math.min(100, Math.max(3, Math.round((notionalVal / maxNotional) * 100)));
+      const tc = TIER[o.tier];
+      return {
+        key: side + i,
+        price: o.price.toFixed(dec),
+        priceColor: side === 'ask' ? 'var(--color-danger)' : 'var(--color-bid)',
+        notional: notionalMode === 'qty' ? this.fmtQty(o.q) : this.fmtMoney(notionalVal),
+        dist: (o.distance * 100).toFixed(2) + '%',
+        barW: pct + '%',
+        barBg: tc ? bg(tc) : t0bg,
+        edge: tc ? edge(tc) : t0edge,
+        tooltip: 'First seen ' + this.fmtAge(now - o.seen) + ' ago',
+      };
+    });
+
+    const asks = [...book.asks].sort((x, y) => y.price - x.price);
+    const bids = [...book.bids].sort((x, y) => y.price - x.price);
+    const asksR = makeRows(asks, 'ask');
+    const bidsR = makeRows(bids, 'bid');
+
+    const mid = (asks[asks.length - 1].price + bids[0].price) / 2;
+    const market = this.props.market ?? 'FUT';
+
+    return {
+      isA, isB, isC, isD,
+      symbol: this.props.symbol ?? 'XRPUSDT',
+      marketLabel: market,
+      marketColor: market === 'SPOT' ? 'var(--color-warning)' : 'var(--color-accent)',
+      marketBorder: market === 'SPOT'
+        ? 'color-mix(in oklab, var(--color-warning) 50%, transparent)'
+        : 'color-mix(in oklab, var(--color-accent) 50%, transparent)',
+      liveDot: (this.props.live ?? true) ? 'var(--color-bid)' : 'var(--color-text-dim)',
+      midPrice: mid.toFixed(dec),
+      showMidPrice: this.props.showMidPrice ?? true,
+      notionalLabel: notionalMode === 'qty' ? 'QTY' : 'NOTIONAL',
+      showHeaders,
+      asksA: asksR, bidsA: bidsR,
+      asksB: asksR, bidsB: bidsR,
+      asksC: asksR, bidsC: bidsR,
+      asksD: asksR, bidsD: bidsR,
+    };
+  }
+}
+</script>
+</body>
+</html>

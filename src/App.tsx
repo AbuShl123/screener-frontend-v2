@@ -3,7 +3,7 @@ import { CheckInboxPage, LoginPage, RegisterPage, VerifyEmailPage } from '@/feat
 import { SessionGate } from '@/app/SessionGate';
 import { ProtectedRoute } from '@/app/ProtectedRoute';
 import { PublicRoute } from '@/app/PublicRoute';
-import { HomePage } from '@/app/HomePage';
+import { DashboardPage } from '@/features/orderbook';
 
 /**
  * Application shell. `SessionGate` gates the whole app on reload with a blocking
@@ -20,7 +20,7 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <HomePage />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
