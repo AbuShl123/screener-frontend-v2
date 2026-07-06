@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, Ref } from 'react';
+import type { InputHTMLAttributes, ReactNode, Ref } from 'react';
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -9,6 +9,8 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
    * Distinct from `error`, which tints the border AND renders its inline `<p>`.
    */
   invalid?: boolean;
+  /** Rendered inside the input's right edge (e.g. the password show/hide toggle). */
+  endAdornment?: ReactNode;
   ref?: Ref<HTMLInputElement>;
 }
 
@@ -18,6 +20,7 @@ export function TextField({
   invalid,
   id,
   className = '',
+  endAdornment,
   ref,
   ...props
 }: TextFieldProps) {
@@ -31,14 +34,19 @@ export function TextField({
       >
         {label}
       </label>
-      <input
-        ref={ref}
-        id={inputId}
-        className={`rounded-[8px] border bg-input px-[14px] py-[13px] text-[15px] text-text-strong placeholder:text-text-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-          error || invalid ? 'border-danger' : 'border-border-input'
-        } ${className}`}
-        {...props}
-      />
+      <div className="relative">
+        <input
+          ref={ref}
+          id={inputId}
+          className={`w-full rounded-[8px] border bg-input py-[13px] pl-[14px] text-[15px] text-text-strong placeholder:text-text-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            endAdornment ? 'pr-11' : 'pr-[14px]'
+          } ${error || invalid ? 'border-danger' : 'border-border-input'} ${className}`}
+          {...props}
+        />
+        {endAdornment ? (
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3">{endAdornment}</div>
+        ) : null}
+      </div>
       {error ? <p className="text-[13px] text-danger">{error}</p> : null}
     </div>
   );

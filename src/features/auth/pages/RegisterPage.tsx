@@ -6,6 +6,7 @@ import { ApiError } from '@/lib/api';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
+import { PasswordField } from '@/components/PasswordField';
 import { SplitAuthLayout } from '@/components/layouts/SplitAuthLayout';
 import { RegisterMarketing } from '../components/RegisterMarketing';
 import { useRegister } from '../queries';
@@ -54,7 +55,8 @@ export function RegisterPage() {
   async function onValid(values: RegisterFormValues) {
     setSubmitError(null);
     try {
-      const res = await registerMut.mutateAsync(values);
+      const { repeatPassword: _repeatPassword, ...registerValues } = values;
+      const res = await registerMut.mutateAsync(registerValues);
       // Use the server-normalized (lowercased) email for display + resend.
       navigate('/register/check-inbox', { state: { email: res.email } });
     } catch (err) {
@@ -109,12 +111,17 @@ export function RegisterPage() {
             invalid={emailTaken}
             {...register('email')}
           />
-          <TextField
+          <PasswordField
             label="Password"
-            type="password"
             placeholder="At least 8 characters"
             invalid={passwordTooShort}
             {...register('password')}
+          />
+          <PasswordField
+            label="Repeat password"
+            placeholder="Re-enter your password"
+            error={errors.repeatPassword?.message}
+            {...register('repeatPassword')}
           />
         </div>
 
