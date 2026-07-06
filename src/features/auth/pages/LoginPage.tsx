@@ -50,7 +50,7 @@ export function LoginPage() {
     setSubmitError(null);
     try {
       await loginMut.mutateAsync(values); // loginAndStore persists tokens + arms refresh
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) setSubmitError(err);
     }

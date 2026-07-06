@@ -9,6 +9,6 @@ import { useSession } from '@/features/auth';
  */
 export function PublicRoute({ children }: { children: ReactNode }) {
   const status = useSession((s) => s.status);
-  if (status === 'authenticated') return <Navigate to="/" replace />;
+  if (status === 'authenticated') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }

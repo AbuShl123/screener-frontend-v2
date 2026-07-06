@@ -19,6 +19,21 @@
   --color-danger: #f26d6d;
   --color-warning: #f5b84d;
 
+  /* Marketing (light) surfaces — intentional exception to the dark-only theme.
+     Used ONLY by the public landing page's Pricing + Features sections. */
+  --color-mkt-surface: #ffffff;            /* Features section bg */
+  --color-mkt-surface-alt: #f2f5fa;        /* Pricing section bg */
+  --color-mkt-card: #f5f7fb;               /* feature card bg */
+  --color-mkt-border: rgba(10, 14, 20, 0.08);
+  --color-mkt-border-strong: rgba(10, 14, 20, 0.1);
+  --color-mkt-heading: #0d1219;            /* h2 */
+  --color-mkt-text: #3e4859;               /* body */
+  --color-mkt-text-secondary: #5a6577;     /* muted body */
+  --color-mkt-text-muted: #8a94a6;         /* labels, per-day line */
+  --color-mkt-accent: #4187d4;             /* eyebrow/accent on white (darker than dark-theme accent) */
+  --color-mkt-positive: #22a06b;           /* OI-alert ▲ glyph */
+  --color-mkt-badge: #1a5fb8;              /* "FLEXIBLE" plan badge bg */
+
   --font-sans: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 }
