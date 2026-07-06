@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/app/ProtectedRoute';
 import { PublicRoute } from '@/app/PublicRoute';
 import { DashboardPage } from '@/features/orderbook';
 import { CheckoutStubPage } from '@/features/billing';
+import { LandingPage } from '@/features/landing';
 
 /**
  * Application shell. `SessionGate` gates the whole app on reload with a blocking
@@ -17,16 +18,9 @@ export default function App() {
   return (
     <SessionGate>
       <Routes>
-        {/* Phase 1: DashboardPage is reachable at both `/` and `/dashboard`. The
-            temporary protected `/` is swapped to the public LandingPage in Phase 2. */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Public marketing home — reachable in any auth state; the page self-adapts
+            (plan §10). No guard: anonymous and authenticated visitors both see it. */}
+        <Route path="/" element={<LandingPage />} />
         <Route
           path="/dashboard"
           element={

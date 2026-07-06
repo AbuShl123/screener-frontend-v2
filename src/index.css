@@ -38,6 +38,10 @@
   --font-mono: 'IBM Plex Mono', monospace;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
