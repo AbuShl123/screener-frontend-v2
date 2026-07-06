@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import { DashboardHeader } from '@/features/orderbook/components/DashboardHeader';
+import { OrderbookCard } from '@/features/orderbook/components/OrderbookCard';
 import { useOrderbookFeed } from '@/features/orderbook/useOrderbookFeed';
 
 /** Display unit for card notionals. Template default is `$ USD`. */
@@ -44,16 +45,9 @@ export function DashboardPage() {
         {keys.length === 0 ? (
           <EmptyState status={status} />
         ) : (
-          <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
-            {/* Session 3 replaces these placeholders with <OrderbookCard bookKey={k} sizeMode={sizeMode} />. */}
+          <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fill,minmax(265px,1fr))]">
             {keys.map((k) => (
-              <div
-                key={k}
-                className="rounded-[10px] border border-border bg-surface px-4 py-3 font-mono
-                           text-[12px] text-text-muted"
-              >
-                {k}
-              </div>
+              <OrderbookCard key={k} bookKey={k} sizeMode={sizeMode} />
             ))}
           </div>
         )}

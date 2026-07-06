@@ -51,8 +51,8 @@ export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: Das
 
       {/* Watchlist context (display only) */}
       <div className="flex items-baseline gap-2">
-        <span className="text-[13px] text-text-muted">Watchlist</span>
-        <span className="font-mono text-[11px] tracking-[0.06em] text-text-dim">
+        <span className="text-[13px] text-text-secondary">Watchlist</span>
+        <span className="font-mono text-[11px] tracking-[0.06em] text-text-muted">
           {tickerCount} TICKERS
         </span>
       </div>
@@ -60,28 +60,25 @@ export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: Das
       <div className="flex-1" />
 
       {/* Size toggle (functional) */}
-      <div className="flex items-center gap-[9px]">
-        <span className="font-mono text-[9px] tracking-[0.08em] text-text-dim">SIZE AS</span>
-        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-input p-[3px]">
-          {(['qty', 'usd'] as const).map((mode) => {
-            const active = sizeMode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onSizeModeChange(mode)}
-                className={`rounded-md px-3 py-[5px] font-mono text-[11px] tracking-[0.04em]
-                            transition-colors ${
-                              active
-                                ? 'bg-accent text-bg'
-                                : 'bg-transparent text-text-muted hover:text-text-strong'
-                            }`}
-              >
-                {mode === 'qty' ? 'QTY' : '$ USD'}
-              </button>
-            );
-          })}
-        </div>
+      <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-input p-[3px]">
+        {(['qty', 'usd'] as const).map((mode) => {
+          const active = sizeMode === mode;
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onSizeModeChange(mode)}
+              className={`rounded-md px-3 py-[5px] font-mono text-[11px] tracking-[0.04em]
+                          transition-colors ${
+                            active
+                              ? 'bg-accent font-semibold text-bg'
+                              : 'bg-transparent text-text-secondary hover:text-text-strong'
+                          }`}
+            >
+              {mode === 'qty' ? 'QTY' : '$ USD'}
+            </button>
+          );
+        })}
       </div>
 
       <span className="h-[22px] w-px bg-border" />
@@ -91,7 +88,7 @@ export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: Das
         type="button"
         title="Settings"
         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border
-                   border-border-input text-[16px] text-text-muted transition-colors
+                   border-border-input text-[16px] text-text-secondary transition-colors
                    hover:bg-white/5 hover:text-text-strong"
       >
         ⚙
@@ -102,7 +99,7 @@ export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: Das
         type="button"
         onClick={onLogout}
         disabled={loggingOut}
-        className="rounded-lg border border-border-input px-4 py-2 text-[13px] text-text-muted
+        className="rounded-lg border border-border-input px-4 py-2 text-[13px] text-text-secondary
                    whitespace-nowrap transition-colors hover:bg-white/5 hover:text-text-strong
                    disabled:cursor-not-allowed disabled:opacity-50"
       >

@@ -416,3 +416,57 @@ automation — the user tests against the real backend manually.
 - Notifications/TTS diff subscriptions (the store's React-free design already supports them).
 - Virtualization/canvas for the book grid — only if profiling shows React rendering can't keep
   up with the ~100ms batch cadence at real ticker counts.
+
+## 13. Post-build deviations from the design template
+
+> Requested by the product owner after reviewing the running Session-3 build (2026-07-06).
+> These intentionally diverge from `.claude/design/Orderbook.dc.html` variant 1d and the
+> dashboard instantiation props; documented here so the template is no longer the sole source
+> of truth for these four points.
+
+1. **Ticker rendered `BASE/QUOTE`.** The template shows the raw concatenated symbol (`BTCUSDT`).
+   We now split off the quote asset and display `BTC/USDT` for readability. Implemented as
+   `fmtSymbol()` in [`format.ts`](../../src/features/orderbook/format.ts) — greedy longest-first
+   match against a known quote-asset list (so `BTCDOMUSDT` → `BTCDOM/USDT`); an unrecognized
+   quote falls back to the raw symbol rather than guessing.
+2. **Futures badge `PERP`, colored green.** The template labels the futures market `FUT` in the
+   accent (blue) color. We relabel it `PERP` (these are perpetual futures) and color it with
+   `--color-bid` green — the conventional market association for futures. SPOT is unchanged
+   (`--color-warning`).
+3. **Live dot removed.** The template's 6px status dot in the card header (§7.3) added no signal
+   — it's redundant with the page-level reconnecting banner — so it was deleted entirely, along
+   with the card's now-unused store `status` subscription. Connection health is surfaced only by
+   the banner under the header (§7.1).
+4. **Denser grid: `minmax(265px, 1fr)`.** §7.1 specified a `340px` column floor. In practice that
+   stretched cards wide enough that a normal laptop fit only 4 columns, and the `1fr` notional
+   column absorbed the slack as an oversized gap between notional and price. Lowering the floor to
+   `265px` (~20% narrower) turns those 4-column layouts into 5 while still fitting the widest
+   content, and closes the visual gap. Everything else about the grid — `auto-fill`, no fixed
+   count, no column cap — is retained.
+
+## 14. Post-build deviations, round 2
+
+> Requested and approved by the product owner after reviewing the running Session-3 build
+> (2026-07-07). Like §13, these intentionally deviate from the design template; they are
+> documented here so the template is no longer the sole source of truth for these points.
+
+1. **Order book rows are sorted by price on the frontend.** The backend does **not** guarantee
+   any ordering of the levels within `bids` / `asks` — it sends them in arbitrary (effectively
+   random) order. Sorting is therefore the frontend's responsibility. Both sides are sorted by
+   **price value** (not notional, distance, or tier) and laid out high→low top-to-bottom (the
+   standard ladder) in [`OrderbookCard.tsx`](../../src/features/orderbook/components/OrderbookCard.tsx):
+   asks descending so the *lowest* ask (nearest the spread) sits immediately **above** the divider,
+   and bids descending so the *highest* bid (nearest the spread) sits immediately **below** it.
+   This replaces the earlier `reverse()` / render-as-is approach (§7.3), which incorrectly assumed
+   the server pre-sorted each side best-first.
+2. **Brighter header text (accessibility).** The design template's header text (everything except
+   the brand mark) had poor contrast against the dark header and was barely readable. We deviate
+   from the template and bump each non-brand element up the semantic text scale in
+   [`DashboardHeader.tsx`](../../src/features/orderbook/components/DashboardHeader.tsx): "Watchlist"
+   and the toggle/Settings/Log-out text → `text-secondary`, the `N TICKERS` count → `text-muted`.
+3. **Active size-toggle legibility.** The active QTY / $ USD pill (dark ink on the accent-blue
+   background) read poorly at 11px. The dark-on-blue direction is the maximal-contrast choice, so
+   rather than change the colors we bumped the active label to `font-semibold`, which fixes the
+   legibility (the thin weight was the real problem).
+4. **`SIZE AS` label removed.** The template shows a `SIZE AS` label in front of the QTY / $ USD
+   toggle. It was dropped as redundant; the toggle now stands on its own.
