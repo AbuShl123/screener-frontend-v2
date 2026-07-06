@@ -9,20 +9,23 @@ data pushed from a Java/Spring backend over WebSocket, lets users configure how 
 classified, and handles subscription access/payments. React 19 + TypeScript SPA built with Vite —
 no SSR meta-framework.
 
-The project is an early-stage foundation: routing, config, and the query client are wired up, but
-the four features below (§ Features) are largely unbuilt. `src/App.tsx` is currently a placeholder
-route.
+**Current state:** the auth feature is fully built (register → verify-email → login → session
+bootstrap → route guards → logout), and with it the supporting infra — REST client, session store,
+routed app shell, and a Tailwind design system. The three remaining features (§ Features) — order
+book, classification rules, billing — are not yet started. `HomePage` is a placeholder
+authenticated shell.
 
 ## Commands
 
 ```bash
 npm run dev         # dev server (HMR) at http://localhost:5173
-npm run build        # tsc --noEmit + production build to dist/
-npm run typecheck    # type-check only, no emit
-npm run preview      # serve the production build locally
+npm run build       # tsc --noEmit + production build to dist/
+npm run typecheck   # type-check only, no emit
+npm run preview     # serve the production build locally
 ```
 
-There is no lint script and no test runner configured yet.
+There is no lint script and no test runner configured yet. `npm run typecheck` (or `build`) is the
+only automated check — run it before considering a change done.
 
 ### Local dev proxy
 
@@ -47,6 +50,16 @@ machine-specific).
 
 `@/*` maps to `src/*` (configured in both `tsconfig.json` and `vite.config.ts` — keep them in
 sync if it changes).
+
+## Styling
+
+Tailwind CSS **v4** (via the `@tailwindcss/vite` plugin), configured entirely in CSS — there is no
+`tailwind.config.js`. The design system lives in [`src/index.css`](src/index.css) as an `@theme`
+block of CSS custom properties. **Use the semantic token classes, not raw hex/Tailwind palette
+colors** — e.g. `bg-surface`, `text-text-secondary`, `border-border-subtle`, `text-accent`,
+`text-bid`, `text-danger`. Fonts are `font-sans` (IBM Plex Sans) and `font-mono` (IBM Plex Mono);
+the order book / numeric data uses mono. It's a dark theme; there is no light mode. Styling is
+Tailwind utility classes inline in JSX — no CSS modules, no styled-components.
 
 ## Architecture
 
@@ -92,52 +105,83 @@ there without over-engineering.
 ```
 src/
   config/      env.ts — the single validated config source, read by nothing else via import.meta.env
-  lib/         shared infra: queryClient.ts, future api/ (REST client) and ws/ (socket client)
-  stores/      real-time state that lives OUTSIDE React (order book)
-  features/    feature modules: auth, order book, rules, billing
-  components/  shared UI primitives
+  lib/         shared infra: queryClient.ts, api/ (auth-agnostic REST client), future ws/ (socket client)
+  app/         app shell: routed guards + bootstrap gate (SessionGate, ProtectedRoute, PublicRoute, HomePage)
+  stores/      real-time state that lives OUTSIDE React (order book) — not yet populated
+  features/    feature modules: auth (built), future order book, rules, billing
+  components/  shared UI primitives (Button, TextField, Card, Banner, BrandMark, …) + layouts/
 ```
+
+### App shell & routing
+
+[`src/App.tsx`](src/App.tsx) is the route table, wrapped in [`SessionGate`](src/app/SessionGate.tsx):
+
+- **`SessionGate`** — on a page reload with rehydrated tokens, it holds a full-screen splash while
+  `GET /me` re-validates the session, then renders routes. The "bootstrapping?" signal is React
+  Query's `useMe` loading state (`status === 'authenticated' && me.isLoading`), *not* a third Zustand
+  status — the token store stays tokens-only. A transient `/me` failure does **not** log the user
+  out; `HomePage` shows a retry fallback.
+- **`ProtectedRoute`** — redirects anonymous visitors to `/login`. Gating is **token-presence only**,
+  it does NOT read `accessState` (paid-feature gating comes later).
+- **`PublicRoute`** — bounces an already-authenticated user off `/login` and `/register`.
+- `/verify-email` and `/register/check-inbox` are unguarded in any auth state (a logged-in user may
+  still click a verification link).
+
+### Auth feature module (`src/features/auth/`)
+
+The auth module has a deliberate, strictly one-way dependency flow — respect it when extending:
+
+```
+pages/ (React) ──► queries.ts (React Query) ──► session.ts (Zustand, tokens-only) ──► api.ts ──► lib/api/client.ts
+                                                        └──► storage.ts (localStorage)
+```
+
+- **`lib/api/client.ts`** — the low-level `request()` HTTP primitive. Auth-agnostic: knows JSON, the
+  backend's `{ message, status, path }` error envelope (thrown as `ApiError`), and Zod validation;
+  attaches a bearer token only if one is handed in. Knows nothing about the store.
+- **`api.ts`** — the seven auth endpoints as pure functions over `request()` + schemas. No store
+  access; protected endpoints take a token argument.
+- **`session.ts`** — the framework-agnostic orchestration core. Owns **TOKENS ONLY** in a Zustand
+  store, plus derived expiry, the proactive-refresh timer, and single-flight refresh. Deliberately
+  does NOT hold the `/me` profile (that's React Query's job) and does NOT navigate — `clearSession()`
+  flips status to `'anonymous'` and the route guards react. `withAuth()` here wraps token-taking
+  calls with refresh-on-401/403-then-retry-once.
+- **`storage.ts`** — thin, guarded localStorage layer for tokens (both access + refresh tokens live
+  in localStorage). Every access is try/catch-guarded so private-mode storage can't crash boot.
+- **`queries.ts`** — React Query ownership of the `/me` profile (`useMe`) + the login/register/
+  resend/verify mutations. The only place the `/me` profile lives.
+- **`schemas.ts`** vs **`validation.ts`** — two separate Zod concerns kept untangled: `schemas.ts`
+  validates **server responses** (source of both validator and TS type); `validation.ts` holds the
+  **form-input** schemas (React Hook Form). Note `authKeys` is defined in `session.ts` (so `logout()`
+  can evict the `/me` cache without a `session → queries` cycle) and re-exported from `queries.ts`.
+
+Import auth surface from the barrel [`@/features/auth`](src/features/auth/index.ts).
 
 ## Features (high-level landscape)
 
-1. **Order book** — the flagship, performance-critical feature. Live, continuously-updated order
+1. **Auth** — ✅ built. Register/verify/login/session/logout per the contract below.
+2. **Order book** — the flagship, performance-critical feature. Live, continuously-updated order
    books; detects meaningful changes (new/removed significant orders) and surfaces them as
    notifications and optional spoken (TTS) alerts. Governed by the real-time architecture above.
-2. **Classification rules** — per-user CRUD for the thresholds that drive how order book levels are
+   Socket protocol: [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md).
+3. **Classification rules** — per-user CRUD for the thresholds that drive how order book levels are
    ranked/analyzed. Conventional forms-and-data work validated against backend rules.
-3. **Monetization & access** — trials, subscription plans, payments. Presents plans, redirects to a
+4. **Monetization & access** — trials, subscription plans, payments. Presents plans, redirects to a
    hosted payment flow, and reflects access state back to the user by **polling** for payment
    outcome rather than trusting the browser redirect.
-4. **Charts** — future work, most likely built on TradingView Lightweight Charts. Not yet scoped.
+5. **Charts** — future work, most likely built on TradingView Lightweight Charts. Not yet scoped.
 
-## Backend auth API contract
+## Reference docs
 
-Full reference: [`.claude/docs/auth-api.md`](.claude/docs/auth-api.md). Key points to hold in mind
-when building the auth feature:
+- [`.claude/docs/auth-api.md`](.claude/docs/auth-api.md) — full auth API contract (summarized below).
+- [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md) — the `/ws` socket
+  protocol: connection, token-as-query-param, every message type and payload shape.
+- [`.claude/docs/frontend-architecture.md`](.claude/docs/frontend-architecture.md) — the high-level
+  "what and why" of the frontend direction (a proposed default, not a locked mandate).
 
-- Base path `/api/auth`. Every non-2xx response across the whole API (not just auth) has the shape
-  `{ message, status, path }` — `message` is safe to show directly to the user. No field-level
-  validation errors.
-- **Registration does not log the user in.** `POST /register` → `202` with no tokens; the account
-  is unverified until the user clicks a Confirm button on an SPA verify page (`/verify-email?token=`).
-  That page must **not** auto-submit on mount — email link scanners pre-fetch the URL, so the token
-  is only consumed by a human-initiated `POST /api/auth/verify-email` click.
-- `POST /api/auth/verify-email` always returns `200` with `status: "success" | "expired" | "invalid"`
-  — never a 4xx for a bad/expired token. `expired`/`invalid` carry no email (the endpoint never
-  receives one), so the resend form on that page must ask the user to type it.
-- `POST /api/auth/resend-verification` always returns `202` with an identical generic body
-  regardless of whether the account exists/is verified/is on cooldown — deliberate anti-enumeration.
-  Don't build UI that tries to distinguish these cases. Client-side cosmetic cooldown (~60s button
-  disable) is fine; there's no server signal to key it off of.
-- `POST /api/auth/login` returns `401 Invalid credentials` / `401 Account disabled` / **`403 Email
-  not verified`**. The `403` case only fires after the password already checked out correct — it's
-  the recovery path for a lost/expired verification email, so it must show its own resend button
-  (using the email already typed into the login form), distinct from the two `401` messages.
-- Tokens: `accessToken` is a JWT (3h default), sent as `Authorization: Bearer <token>` on REST calls
-  **and** as `?token=` on the `/ws` WebSocket connection URL — same token, not the refresh token.
-  `refreshToken` is opaque (only ever sent to `/api/auth/refresh`); the backend keeps one active
-  refresh token per user, so each login/refresh invalidates the previous one. Schedule proactive
-  refresh around `expiresIn - 60s` rather than waiting for a 401. Any `401` from `/refresh` itself
-  means hard logout — clear storage, route to login.
-- `GET /api/auth/me` is the bootstrap/hydration call after login or on page reload. Gate paid
-  features on `accessState` (`TRIAL` / `ACTIVE` / `EXPIRED` / `ADMIN`), not on `role`.
+## Testing changes
+
+**Do NOT use the Playwright MCP (or any browser automation) to test the app after implementing
+something.** The user tests manually. After a change, run `npm run typecheck` to confirm it
+compiles — that's the expected verification step. Don't spin up the dev server to drive the UI
+yourself unless explicitly asked.
