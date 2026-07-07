@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import { DashboardHeader } from '@/features/orderbook/components/DashboardHeader';
 import { OrderbookCard } from '@/features/orderbook/components/OrderbookCard';
+import { NotificationHandle } from '@/features/orderbook/components/NotificationHandle';
+import { NotificationPanel, PANEL_WIDTH } from '@/features/orderbook/components/NotificationPanel';
 import { useOrderbookFeed } from '@/features/orderbook/useOrderbookFeed';
 
 /** Display unit for card notionals. Template default is `$ USD`. */
@@ -23,6 +25,9 @@ export function DashboardPage() {
   useOrderbookFeed();
 
   const [sizeMode, setSizeMode] = useState<SizeMode>('usd');
+  // Owned here because TWO things depend on it: the handle's visibility and `<main>`'s
+  // right padding. Default open to match the template exactly.
+  const [notifOpen, setNotifOpen] = useState(true);
   const keys = useOrderbookStore((s) => s.keys);
   const status = useOrderbookStore((s) => s.status);
 
@@ -41,7 +46,12 @@ export function DashboardPage() {
         </div>
       )}
 
-      <main className="px-8 pt-7 pb-12">
+      {/* Right padding opens up for the panel; animates in step with the slide. `px-8`
+          already gives a 32px right gutter, so open we override to keep it beyond the panel. */}
+      <main
+        className="px-8 pt-7 pb-12 [transition:padding-right_260ms_cubic-bezier(0.22,0.61,0.36,1)]"
+        style={{ paddingRight: notifOpen ? `${PANEL_WIDTH + 32}px` : undefined }}
+      >
         {keys.length === 0 ? (
           <EmptyState status={status} />
         ) : (
@@ -52,6 +62,10 @@ export function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Fixed-position overlays — siblings of `<main>`, not inside the grid. */}
+      <NotificationHandle open={notifOpen} onOpen={() => setNotifOpen(true)} />
+      <NotificationPanel open={notifOpen} sizeMode={sizeMode} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

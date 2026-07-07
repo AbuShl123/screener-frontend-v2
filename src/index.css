@@ -21,6 +21,10 @@
 
   --font-sans: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Left-cast card shadow for the slide-out notification rail + its collapsed handle
+     (design template's `--shadow-card`). Directional so it reads against the right edge. */
+  --shadow-card: -16px 0 40px -24px rgba(0, 0, 0, 0.7);
 }
 
 html {
@@ -31,4 +35,29 @@ body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+}
+
+/*
+ * Slim, unobtrusive scrollbar matching the dark terminal chrome (default browser bars
+ * clash with the theme). Thumb is a translucent white pill inset via a transparent
+ * border; track is invisible. Applied to the notifications rail list.
+ */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+.scrollbar-slim::-webkit-scrollbar {
+  width: 10px;
+}
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.22);
 }

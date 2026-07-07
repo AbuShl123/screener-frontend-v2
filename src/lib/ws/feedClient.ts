@@ -1,6 +1,7 @@
 import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
 import type { FeedMessage, Level, OrderBook } from '@/features/orderbook/types';
+import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 
 /**
@@ -54,6 +55,9 @@ export function stopFeed(): void {
   }
   cancelFlush();
   buffer = [];
+  // Drop this session's notifications so logout / unmount doesn't leak them into the
+  // next session (plan §6c). Harmless under StrictMode's mount→unmount→mount.
+  useNotificationStore.getState().clear();
   if (ws) {
     const socket = ws;
     ws = null;
@@ -265,5 +269,6 @@ function flush(): void {
   if (buffer.length === 0) return;
   const batch = buffer;
   buffer = [];
-  useOrderbookStore.getState().applyMessages(batch);
+  const candidates = useOrderbookStore.getState().applyMessages(batch);
+  if (candidates.length) useNotificationStore.getState().push(candidates);
 }

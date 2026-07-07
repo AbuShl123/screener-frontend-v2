@@ -5,6 +5,19 @@
  * unit-testable later; future surfaces (notifications/TTS) can reuse them.
  */
 
+import type { Market } from '@/features/orderbook/types';
+
+/**
+ * PERP/SPOT market badge — label + semantic border/text token classes. Shared by the
+ * order-book card header and the notification card so both read one definition:
+ * perpetual futures badge PERP in the bid green (market convention), spot in warning.
+ */
+export function marketBadge(market: Market): { label: string; className: string } {
+  return market === 'FUTURES'
+    ? { label: 'PERP', className: 'text-bid border-bid/50' }
+    : { label: 'SPOT', className: 'text-warning border-warning/50' };
+}
+
 /**
  * Decimal places for a price. We have no per-symbol tick size, so we derive it from
  * the price magnitude itself (template's rule): pricier assets need fewer decimals.
@@ -49,6 +62,13 @@ export function fmtQty(q: number): string {
 /** Distance from mid, formatted from the raw fraction (doc-mandated): `1.23%`. */
 export function fmtDistance(distance: number): string {
   return (distance * 100).toFixed(2) + '%';
+}
+
+/** Wall-clock `HH:MM:SS` from epoch ms, for the notification timestamp. */
+export function fmtClock(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 /**

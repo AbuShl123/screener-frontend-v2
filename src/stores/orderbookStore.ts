@@ -1,9 +1,11 @@
 import { create } from 'zustand';
+import { selectNotifications } from '@/features/orderbook/notifications/selectNotifications';
 import {
   bookKey,
   type BookKey,
   type FeedMessage,
   type FeedStatus,
+  type Notification,
   type OrderBook,
 } from '@/features/orderbook/types';
 
@@ -28,8 +30,12 @@ interface OrderbookState {
    * Apply one coalesced batch of feed messages (in arrival order) in a SINGLE
    * `set()` — one subscriber-notification pass per flush regardless of how many
    * tickers changed in the window. The feed client is the only caller.
+   *
+   * Returns the notifications raised by this batch (each ADD/UPDATE is diffed against
+   * the book's PRE-overwrite state); the caller forwards them to `notificationStore`
+   * so this store stays free of any store→store coupling (plan §3, §6a).
    */
-  applyMessages(batch: FeedMessage[]): void;
+  applyMessages(batch: FeedMessage[]): Notification[];
   setStatus(s: FeedStatus): void;
   clear(): void;
 }
@@ -43,6 +49,7 @@ export const useOrderbookStore = create<OrderbookState>((set) => ({
   status: 'connecting',
 
   applyMessages(batch) {
+    const candidates: Notification[] = [];
     set((state) => {
       let books = state.books;
       // `books` starts as the live reference; the first mutating message clones it
@@ -80,6 +87,10 @@ export const useOrderbookStore = create<OrderbookState>((set) => ({
           case 'UPDATE': {
             const k = bookKey(msg.symbol, msg.market);
             own();
+            // Diff against the PREVIOUS book: `books[k]` is still the old value here
+            // (undefined for a brand-new ticker), before the upsert overwrites it.
+            const raised = selectNotifications(books[k], msg);
+            if (raised.length) candidates.push(...raised);
             if (!(k in books)) keysChanged = true; // a new ticker → keys must be recomputed
             books[k] = {
               symbol: msg.symbol,
@@ -109,6 +120,8 @@ export const useOrderbookStore = create<OrderbookState>((set) => ({
         ? { books, keys: Object.keys(books).sort(compareKeys) }
         : { books };
     });
+    // `set` ran synchronously, so `candidates` is fully populated (plan §9).
+    return candidates;
   },
 
   setStatus(s) {

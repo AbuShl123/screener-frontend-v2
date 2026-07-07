@@ -7,8 +7,10 @@ import {
   fmtMoney,
   fmtQty,
   fmtSymbol,
+  marketBadge,
   priceDecimals,
 } from '@/features/orderbook/format';
+import { barBackground } from '@/features/orderbook/tiers';
 
 /**
  * One live order book — design template "Orderbook", variant **1d** (notional /
@@ -18,23 +20,10 @@ import {
  * slice, so a BTC store update never re-renders the ETH card. `content-visibility:
  * auto` lets the browser skip layout/paint for off-screen cards even after React
  * updated their DOM — the cheapest lever against "many symbols at once".
+ *
+ * Tier colors + `barBackground` live in the shared [`tiers`] module (also used by the
+ * notification stripe); the market badge in [`marketBadge`].
  */
-
-/**
- * Tier → bar color. Values are the dashboard's chosen tier scale (Dashboard template
- * props: tier1–4), NOT theme tokens — they're tier-scale data-viz colors specific to
- * this card, and the exact values the future "settings" feature would expose. Index 0
- * (and any out-of-range tier) has no color: the dashboard runs `tier0=hidden`.
- */
-const TIER_COLORS: readonly (string | null)[] = [null, '#57ff92', '#f7bb18', '#ff8080', '#a12eff'];
-/** Bar fill opacity (%) — the dashboard's `fillOpacity` prop. */
-const FILL_OPACITY = 26;
-
-/** Bar background for a tier, or `transparent` for tier 0 / out-of-range (hidden). */
-function barBackground(tier: number): string {
-  const hex = TIER_COLORS[tier];
-  return hex ? `color-mix(in oklab, ${hex} ${FILL_OPACITY}%, transparent)` : 'transparent';
-}
 
 interface OrderbookCardProps {
   bookKey: BookKey;
@@ -62,9 +51,7 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   const asks = [...book.asks].sort((a, b) => b.price - a.price);
   const bids = [...book.bids].sort((a, b) => b.price - a.price);
 
-  const isFutures = book.market === 'FUTURES';
-  // Perpetual futures badged PERP in green (the market convention); spot in warning.
-  const badgeClasses = isFutures ? 'text-bid border-bid/50' : 'text-warning border-warning/50';
+  const badge = marketBadge(book.market);
 
   return (
     <div
@@ -74,9 +61,9 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
       {/* Card header: market badge + symbol (mid price & column headers off) */}
       <div className="flex items-center gap-2.5 border-b border-border-subtle px-4 py-[11px]">
         <span
-          className={`rounded border px-[5px] py-px font-mono text-[9px] tracking-[0.08em] ${badgeClasses}`}
+          className={`rounded border px-[5px] py-px font-mono text-[9px] tracking-[0.08em] ${badge.className}`}
         >
-          {isFutures ? 'PERP' : 'SPOT'}
+          {badge.label}
         </span>
         <span className="font-mono text-[13px] tracking-[0.04em] text-text">
           {fmtSymbol(book.symbol)}

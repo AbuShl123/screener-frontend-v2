@@ -30,6 +30,22 @@ export interface OrderBook {
 /** Connection status the feed client publishes to the store for the UI to reflect. */
 export type FeedStatus = 'connecting' | 'connected' | 'reconnecting' | 'auth-failed';
 
+/**
+ * A surfaced order-book event shown in the notifications panel. Tier 0 is never emitted
+ * (only meaningful tiers 1–4 raise a notification, by construction).
+ */
+export interface Notification {
+  id: string; // stable React key
+  symbol: string; // raw exchange symbol, e.g. 'XRPUSDT'
+  market: Market;
+  side: 'bid' | 'ask';
+  price: number;
+  notional: number; // dollar notional (base for both $ and QTY display)
+  tier: 1 | 2 | 3 | 4; // 0 excluded by construction
+  distance: number; // FRACTION (0.0026 = 0.26%) — format at render time
+  timeMillis: number; // epoch ms of detection — format via fmtClock() at render
+}
+
 export type BookKey = string; // `${symbol}:${market}`
 
 /** The single canonical key for a book. Always key local state on (symbol, market). */
