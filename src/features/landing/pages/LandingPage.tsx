@@ -9,9 +9,11 @@ import { LandingFooter } from '../components/LandingFooter';
  * Public marketing home page (plan §8). Reachable in any auth state; the header
  * and CTAs self-adapt via `useLandingNav`.
  *
- * The dark→light→light→dark rhythm follows the template: Hero (dark) →
- * Pricing (light) → Features (light) → CTA (dark). The Pricing/Features sections
- * own their `id` + `scroll-mt` so the header's anchor jumps clear the sticky bar.
+ * All sections are dark (the v2 design template). Smooth transitions come from
+ * stepping the section surface between near-blacks — page `bg` (Hero, CTA) →
+ * `surface` (Pricing) → `surface-marketing` (Features) — rather than the v1
+ * dark→light→light→dark rhythm. The Pricing/Features sections own their `id` +
+ * `scroll-mt` so the header's anchor jumps clear the sticky bar.
  */
 export function LandingPage() {
   return (

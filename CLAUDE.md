@@ -178,6 +178,8 @@ Import auth surface from the barrel [`@/features/auth`](src/features/auth/index.
   protocol: connection, token-as-query-param, every message type and payload shape.
 - [`.claude/docs/frontend-architecture.md`](.claude/docs/frontend-architecture.md) — the high-level
   "what and why" of the frontend direction (a proposed default, not a locked mandate).
+- [`.claude/docs/landing-page.md`](.claude/docs/landing-page.md) — how the public landing page +
+  billing data layer are built: module shape, routing, the plans data flow, and design-token usage.
 
 ## Testing changes
 

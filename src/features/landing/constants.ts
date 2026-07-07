@@ -22,7 +22,7 @@ export const STATS: Stat[] = [
 
 /**
  * A feature card's leading glyph (plan §8.1). Either the rotated accent square
- * or a mono text glyph tinted with a marketing token.
+ * or a mono text glyph tinted with a theme token.
  */
 export type FeatureGlyph =
   | { kind: 'square' }
@@ -47,22 +47,22 @@ export const FEATURES: Feature[] = [
     body: 'Set custom classification thresholds per ticker. Levels are ranked by proximity to the spread and notional value — significance on your terms, not ours.',
   },
   {
-    glyph: { kind: 'text', char: '▁▃▂▅▇', className: 'text-mkt-accent', tracking: true },
+    glyph: { kind: 'text', char: '▁▃▂▅▇', className: 'text-accent', tracking: true },
     label: 'Charts',
     body: 'Volume-change charts for every ticker on every exchange, plus candlestick data — see where activity is building before the move.',
   },
   {
-    glyph: { kind: 'text', char: '▲', className: 'text-mkt-positive' },
+    glyph: { kind: 'text', char: '▲', className: 'text-bid' },
     label: 'Open interest alerts',
     body: "When a ticker's open interest grows unusually large, you're notified the moment it happens — not an hour later.",
   },
   {
-    glyph: { kind: 'text', char: '◉', className: 'text-mkt-accent' },
+    glyph: { kind: 'text', char: '◉', className: 'text-accent' },
     label: 'Voice notifications',
     body: 'Alerts are read out loud with text-to-speech. Watch the market without watching the screen.',
   },
   {
-    glyph: { kind: 'text', char: '<1s', className: 'text-mkt-accent' },
+    glyph: { kind: 'text', char: '<1s', className: 'text-accent' },
     label: 'Built for volume',
     body: 'Engineered for hundreds of thousands of book updates per second. No queues, no sampling, no lag — the number you see is the market now.',
   },
