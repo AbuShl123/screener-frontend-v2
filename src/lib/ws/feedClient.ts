@@ -1,5 +1,6 @@
 import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
+import { filterAnnounced, resetCooldown } from '@/features/orderbook/notifications/cooldown';
 import type { FeedMessage, Level, OrderBook } from '@/features/orderbook/types';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
@@ -58,6 +59,8 @@ export function stopFeed(): void {
   // Drop this session's notifications so logout / unmount doesn't leak them into the
   // next session (plan §6c). Harmless under StrictMode's mount→unmount→mount.
   useNotificationStore.getState().clear();
+  // Forget cooldown history too, so the next session isn't silenced by the last one's.
+  resetCooldown();
   if (ws) {
     const socket = ws;
     ws = null;
@@ -270,5 +273,7 @@ function flush(): void {
   const batch = buffer;
   buffer = [];
   const candidates = useOrderbookStore.getState().applyMessages(batch);
-  if (candidates.length) useNotificationStore.getState().push(candidates);
+  // Drop repeats of a still-in-cooldown order (top-5 churn re-raises identical levels).
+  const fresh = filterAnnounced(candidates);
+  if (fresh.length) useNotificationStore.getState().push(fresh);
 }

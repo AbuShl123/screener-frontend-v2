@@ -32,6 +32,7 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
   const notifications = useNotificationStore((s) => s.notifications);
   const unread = useNotificationStore((s) => s.unread);
   const markRead = useNotificationStore((s) => s.markRead);
+  const clear = useNotificationStore((s) => s.clear);
 
   // Reset unread on each open transition (and on initial mount when default-open).
   // Depends on `open` only — NOT on `notifications` — so while the panel is open the
@@ -63,17 +64,47 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
             {unread} NEW
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          title="Collapse"
-          aria-label="Collapse notifications"
-          className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg
-                     border border-border-input text-[16px] leading-none text-text-secondary
-                     transition-colors hover:bg-white/5 hover:text-text-strong"
-        >
-          ×
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Clear all — deletes every notification (does not affect the cooldown dedup). */}
+          <button
+            type="button"
+            onClick={clear}
+            disabled={notifications.length === 0}
+            title="Clear all notifications"
+            aria-label="Clear all notifications"
+            className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg
+                       border border-border-input text-text-secondary transition-colors
+                       hover:bg-white/5 hover:text-danger
+                       disabled:pointer-events-none disabled:opacity-40"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 6h18" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M10 11v6" />
+              <path d="M14 11v6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Collapse"
+            aria-label="Collapse notifications"
+            className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg
+                       border border-border-input text-[16px] leading-none text-text-secondary
+                       transition-colors hover:bg-white/5 hover:text-text-strong"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Search */}
