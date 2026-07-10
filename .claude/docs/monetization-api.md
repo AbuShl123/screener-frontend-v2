@@ -88,7 +88,7 @@ All timestamps are ISO-8601 instants in UTC (`"2026-08-14T09:30:00Z"`), Jackson-
 | `PAID`    | ✅        | Payment confirmed, access granted                        |
 | `EXPIRED` | ✅        | Invoice TTL (30 min) elapsed with no payment             |
 | `FAILED`  | ✅        | Provider reported an error / amount mismatch             |
-| `CANCELED`| ✅        | Superseded by a different-plan order before payment      |
+| `CANCELED`| ✅        | Canceled before payment — user-canceled, or superseded by a different-plan order |
 | `REVERTED`| ✅        | Refund detected — **recorded only; access is NOT revoked** |
 
 At most **one open order** (`CREATED`/`PENDING`) exists per user at a time.
@@ -232,6 +232,7 @@ a foreign `{id}` returns 404).
 | `POST` | `/api/billing/orders` | `CreateOrderRequest` | `OrderDetailsEntry` (created order, with `checkoutUrl`) |
 | `GET`  | `/api/billing/orders` | — | `OrderDetailsEntry[]` — history, newest first (cap 100) |
 | `GET`  | `/api/billing/orders/current` | — | `OrderDetailsEntry` — latest open / most-recent order (**poll this**) |
+| `POST` | `/api/billing/orders/current/cancel` | — | `OrderDetailsEntry` — the now-`CANCELED` order (or **409** if it isn't `PENDING`) |
 | `GET`  | `/api/billing/orders/{id}` | — | `OrderDetailsEntry` for that order |
 | `GET`  | `/api/billing/orders/{id}/history` | — | `OrderHistoryEntry[]` — status-transition audit, newest first |
 
@@ -308,6 +309,30 @@ Returned by create **and** every status read. Fields:
 `source` ∈ `API | CALLBACK | RECONCILIATION | SYSTEM`. Ordered by `seq DESC` (monotonic). Purely for an
 audit/debug view.
 
+#### Cancel the current order — `POST /api/billing/orders/current/cancel`
+
+Cancels the caller's current order (the same order `GET /orders/current` returns) and cancels its unpaid
+Multicard invoice, so a user can abandon a checkout immediately instead of waiting out the 30-min TTL.
+No request body.
+
+- **Succeeds only when the current order is `PENDING`** → transitions it to `CANCELED` and returns the
+  updated `OrderDetailsEntry` (`status: "CANCELED"`, `reason: "USER_CANCELED"`).
+- The Multicard invoice cancel is **best-effort**: the local `CANCELED` is committed even if the provider
+  call fails, so the response is authoritative for your UI.
+
+**Response codes:**
+
+| Status | When | Handling |
+|--------|------|----------|
+| `200` | Current order was `PENDING` → now `CANCELED` | Clear the pending-payment UI; let the user pick a plan again |
+| `409` | Current order is **not** `PENDING` (already `PAID`, or terminal) | A paid/terminal order has no live invoice — refetch `current`/`entitlement` and reconcile the UI |
+| `404` | User has no orders at all | — |
+
+> **Race note:** if the user actually paid on Multicard's page just before cancelling, the cancel may 200
+> with `CANCELED`, but the authoritative success callback can still later flip the order `CANCELED → PAID`
+> and grant access. So after a cancel, still trust `GET /api/billing/entitlement` for the real access
+> state rather than assuming the cancel was final.
+
 ---
 
 ## 5. How a payment is actually made
@@ -357,7 +382,7 @@ and the sweep marks it `EXPIRED`.
 | `PAID` | success | refetch entitlement, show success + new expiry, unlock |
 | `EXPIRED` | TTL elapsed, unpaid | "Payment not completed" → let them start a new order |
 | `FAILED` | provider error / amount mismatch | failure screen showing `reason`/`reasonDetail` |
-| `CANCELED` | superseded by a newer order | usually silent — a newer order is now current |
+| `CANCELED` | user-canceled, or superseded by a newer order | usually silent — the user abandoned it, or a newer order is now current |
 | `REVERTED` | refund detected | rare; note access is **not** auto-revoked |
 
 ### 5.2 Recovering in-flight state
@@ -373,10 +398,20 @@ response:
   duplicate.
 - **Re-pay, different plan:** just `POST` the new plan; the backend supersedes (cancels) the old order.
 
-### 5.3 There is no user-facing "cancel order" endpoint
+### 5.3 Canceling a `PENDING` order
 
-To abandon a `PENDING` order the user must either wait out the 30-min TTL or start a *different* plan
-(which supersedes it). An explicit cancel endpoint is a known gap (backend doc / flow doc §4.2).
+The user can abandon an in-flight checkout three ways:
+
+- **Explicit cancel** — `POST /api/billing/orders/current/cancel` (§4.3). Immediately flips the `PENDING`
+  order to `CANCELED` and cancels the Multicard invoice. Use this for a "Cancel payment" button on the
+  polling/resume screen; on `200`, clear the pending UI and let them pick a plan again.
+- **Start a different plan** — a new `POST /api/billing/orders` for another plan supersedes (cancels) the
+  old order automatically.
+- **Do nothing** — the invoice's 30-min TTL elapses and the reconciliation sweep marks it `EXPIRED`.
+
+After an explicit cancel, still trust `GET /api/billing/entitlement` for the true access state — a payment
+that landed a moment before the cancel can still be granted by the success callback (see the race note in
+§4.3).
 
 ---
 
@@ -388,6 +423,7 @@ To abandon a `PENDING` order the user must either wait out the 30-min TTL or sta
 - [ ] Disable/hide FIXED plans when entitlement is `ACTIVE` and expiry is > 5 days out (a POST would 409). Keep pay-as-you-go enabled always.
 - [ ] `POST /api/billing/orders` → redirect to `checkoutUrl`; auto-retry once on a 409 *race* (distinguish from the 409 renewal gate by the current entitlement state).
 - [ ] `return_url` page polls `GET /api/billing/orders/current` (~2s); resolve on `PAID`, keep going through slow `PENDING`, time out gracefully.
+- [ ] Offer a "Cancel payment" action on the polling/resume screen → `POST /api/billing/orders/current/cancel`; on 200 clear the pending UI, on 409 refetch `current`/`entitlement` and reconcile.
 - [ ] On `PAID`, refetch `entitlement` before unlocking.
 - [ ] Never treat the browser return as proof of payment.
 - [ ] Treat an empty-body 403 as "not authenticated" → refresh token or bounce to login, then resume from `current`.

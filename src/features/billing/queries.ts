@@ -1,6 +1,14 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
-import { createOrder, fetchPlans, fetchPayAsYouGoDays } from './api';
+import { queryClient } from '@/lib/queryClient';
+import { authKeys } from '@/features/auth';
+import {
+  cancelCurrentOrder,
+  createOrder,
+  fetchCurrentOrder,
+  fetchPlans,
+  fetchPayAsYouGoDays,
+} from './api';
 import type { CreateOrderRequest } from './schemas';
 
 /**
@@ -16,6 +24,7 @@ export const billingKeys = {
   all: ['billing'] as const,
   plans: ['billing', 'plans'] as const,
   paygDays: (amount: number) => ['billing', 'payg-days', amount] as const,
+  currentOrder: ['billing', 'orders', 'current'] as const,
 };
 
 export function usePlans() {
@@ -56,5 +65,60 @@ export function useCreateOrder() {
   return useMutation({
     mutationFn: (body: CreateOrderRequest) => createOrder(body),
     retry: (count, err) => count < 1 && err instanceof ApiError && err.status === 409,
+  });
+}
+
+/**
+ * Poll `GET /api/billing/orders/current` for the return_url status page (plan §1b). While
+ * the order is still open (`PENDING`, or the transient `CREATED`) it re-fetches every 2s;
+ * it auto-stops on any terminal status or a `null` (404, no order). The state machine
+ * (`usePaymentStatus`) additionally flips `enabled` off once it decides an outcome, so
+ * nothing polls after resolution or the 90s timeout.
+ */
+export function useCurrentOrder(enabled: boolean) {
+  return useQuery({
+    queryKey: billingKeys.currentOrder,
+    queryFn: ({ signal }) => fetchCurrentOrder(signal),
+    enabled,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === 'PENDING' || s === 'CREATED' ? 2000 : false; // stop on terminal / null
+    },
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+/**
+ * One-shot read of the latest / open order for the Account page's unpaid-invoice card —
+ * shares `orders/current` with `useCurrentOrder` but does NOT poll (the account page only
+ * needs to know whether a `PENDING` invoice exists, not watch it settle). `null` = no order.
+ */
+export function useLatestOrder() {
+  return useQuery({
+    queryKey: billingKeys.currentOrder,
+    queryFn: ({ signal }) => fetchCurrentOrder(signal),
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+/**
+ * Cancel the current `PENDING` order (`POST /orders/current/cancel`, monetization-api.md §4.3).
+ * On success we prime the `orders/current` cache with the returned `CANCELED` order (so the
+ * invoice card clears immediately) and invalidate `/me` — a payment that landed just before the
+ * cancel can still flip the order to `PAID`, so access state is re-fetched rather than assumed.
+ * On a 409/404 (order no longer `PENDING`, or gone) we refetch `orders/current` to reconcile.
+ */
+export function useCancelOrder() {
+  return useMutation({
+    mutationFn: () => cancelCurrentOrder(),
+    onSuccess: (order) => {
+      queryClient.setQueryData(billingKeys.currentOrder, order);
+      queryClient.invalidateQueries({ queryKey: authKeys.me });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.currentOrder });
+    },
   });
 }

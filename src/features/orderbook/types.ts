@@ -28,7 +28,7 @@ export interface OrderBook {
 }
 
 /** Connection status the feed client publishes to the store for the UI to reflect. */
-export type FeedStatus = 'connecting' | 'connected' | 'reconnecting' | 'auth-failed';
+export type FeedStatus = 'connecting' | 'connected' | 'reconnecting' | 'auth-failed' | 'access-denied';
 
 /**
  * A surfaced order-book event shown in the notifications panel. Tier 0 is never emitted

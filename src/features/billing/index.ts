@@ -1,7 +1,14 @@
 // Public surface of the billing feature. Import from `@/features/billing`.
 
 // React Query ownership of the plans catalog + pay-as-you-go days conversion + create-order
-export { usePlans, usePayAsYouGoDays, useCreateOrder, billingKeys } from './queries';
+export {
+  usePlans,
+  usePayAsYouGoDays,
+  useCreateOrder,
+  useLatestOrder,
+  useCancelOrder,
+  billingKeys,
+} from './queries';
 
 // Presentation catalog (copy map + fallback-first merge → PlanView[])
 export { buildPlanViews, type PlanView, type PlanCopy } from './catalog';
@@ -22,7 +29,9 @@ export {
 } from './schemas';
 
 // Pages
+export { AccountPage } from './pages/AccountPage';
 export { CheckoutStubPage } from './pages/CheckoutStubPage';
 export { ChoosePlanPage } from './pages/ChoosePlanPage';
 export { PayByDaysPage } from './pages/PayByDaysPage';
 export { PaymentMethodPage } from './pages/PaymentMethodPage';
+export { PaymentStatusPage } from './pages/PaymentStatusPage';

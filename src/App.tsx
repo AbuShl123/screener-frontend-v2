@@ -5,10 +5,12 @@ import { ProtectedRoute } from '@/app/ProtectedRoute';
 import { PublicRoute } from '@/app/PublicRoute';
 import { DashboardPage } from '@/features/orderbook';
 import {
+  AccountPage,
   CheckoutStubPage,
   ChoosePlanPage,
   PayByDaysPage,
   PaymentMethodPage,
+  PaymentStatusPage,
 } from '@/features/billing';
 import { LandingPage } from '@/features/landing';
 
@@ -31,6 +33,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountPage />
             </ProtectedRoute>
           }
         />
@@ -63,6 +73,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <PaymentMethodPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing/status"
+          element={
+            <ProtectedRoute>
+              <PaymentStatusPage />
             </ProtectedRoute>
           }
         />

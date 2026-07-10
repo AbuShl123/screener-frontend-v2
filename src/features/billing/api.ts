@@ -1,4 +1,4 @@
-import { request } from '@/lib/api';
+import { request, ApiError } from '@/lib/api';
 import { withAuth } from '@/features/auth';
 import {
   plansResponseSchema,
@@ -56,4 +56,39 @@ export const createOrder = (
 ): Promise<OrderDetails> =>
   withAuth((token) =>
     request(ORDERS, { method: 'POST', body, token, schema: orderDetailsSchema, signal }),
+  );
+
+/**
+ * `GET /api/billing/orders/current` — the latest open / most-recent order, the single
+ * source of truth the return_url page polls to learn a payment outcome (monetization-api.md
+ * §4.3 / §5). Authed via `withAuth` (same refresh-on-401/empty-403-then-retry-once as
+ * `createOrder`).
+ *
+ * A **404 resolves to `null`** — the backend returns it when the account has no order at
+ * all, which the status page renders as its distinct "order not found" variant rather than
+ * an error. Any other failure still throws.
+ */
+export const fetchCurrentOrder = (signal?: AbortSignal): Promise<OrderDetails | null> =>
+  withAuth((token) =>
+    request(`${ORDERS}/current`, { method: 'GET', token, schema: orderDetailsSchema, signal }),
+  ).catch((e) => {
+    if (e instanceof ApiError && e.status === 404) return null; // no current order
+    throw e;
+  });
+
+/**
+ * `POST /api/billing/orders/current/cancel` — abandon the caller's current order and its
+ * unpaid Multicard invoice (monetization-api.md §4.3). Succeeds only when the current order
+ * is `PENDING`; returns the now-`CANCELED` `OrderDetailsEntry`. A **409** (order not
+ * `PENDING`) or **404** (no orders) still throws — the caller reconciles via `orders/current`.
+ * Authed via `withAuth`, same as the other order calls.
+ */
+export const cancelCurrentOrder = (signal?: AbortSignal): Promise<OrderDetails> =>
+  withAuth((token) =>
+    request(`${ORDERS}/current/cancel`, {
+      method: 'POST',
+      token,
+      schema: orderDetailsSchema,
+      signal,
+    }),
   );

@@ -136,8 +136,19 @@ function onClose(e: CloseEvent): void {
 
   if (intentionalClose || !running) return;
 
-  // 1008 = auth failure at handshake (doc §7.3): refresh, then reconnect immediately.
+  // 1008 is overloaded by the backend: a bad/expired token (fixable by refreshing)
+  // and "no subscription" (NOT fixable by refreshing — the token is fine) both close
+  // with this same code. Only the token case should refresh-and-immediately-retry;
+  // treating both the same causes a same-token 1008 to loop as fast as the network
+  // allows, since refreshTokens() keeps succeeding trivially.
   if (e.code === 1008) {
+    if (isSubscriptionRequired(e.reason)) {
+      running = false;
+      ws = null;
+      useOrderbookStore.getState().setStatus('access-denied');
+      return;
+    }
+
     refreshTokens()
       .then(() => {
         if (running) void connect();
@@ -152,6 +163,11 @@ function onClose(e: CloseEvent): void {
   // Any other code (1001 eviction, 1006 network, …): reconnect with backoff.
   useOrderbookStore.getState().setStatus('reconnecting');
   scheduleReconnect();
+}
+
+/** The backend closes 1008 for "no subscription" too — distinguish it via the close reason. */
+function isSubscriptionRequired(reason: string): boolean {
+  return /subscription/i.test(reason);
 }
 
 function scheduleReconnect(): void {

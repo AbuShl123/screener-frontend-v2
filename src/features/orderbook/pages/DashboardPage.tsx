@@ -75,9 +75,11 @@ function EmptyState({ status }: { status: ReturnType<typeof useOrderbookStore.ge
   const message =
     status === 'auth-failed'
       ? 'Feed unavailable — your session could not be authorized.'
-      : status === 'connected'
-        ? 'Waiting for order books…'
-        : 'Connecting…';
+      : status === 'access-denied'
+        ? 'Feed unavailable — an active subscription is required.'
+        : status === 'connected'
+          ? 'Waiting for order books…'
+          : 'Connecting…';
 
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
