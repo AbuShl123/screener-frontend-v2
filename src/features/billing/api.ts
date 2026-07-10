@@ -1,20 +1,28 @@
 import { request } from '@/lib/api';
+import { withAuth } from '@/features/auth';
 import {
   plansResponseSchema,
   payAsYouGoDaysSchema,
+  orderDetailsSchema,
   type PlansResponse,
   type PayAsYouGoDays,
+  type OrderDetails,
+  type CreateOrderRequest,
 } from './schemas';
 
 /**
  * The billing endpoints as pure functions over `request` + the schemas, mirroring
- * the auth module's `api.ts`. NO store access.
+ * the auth module's `api.ts`.
  *
- * `GET /api/billing-catalog/plans` is PUBLIC (no JWT) — it takes no token argument and stays
- * outside the session layer's `withAuth` machinery entirely.
+ * The catalog reads (`/api/billing-catalog/*`) are PUBLIC (no JWT) — they take no token
+ * and stay outside the session layer entirely. `createOrder` is the first AUTHED billing
+ * call: it delegates token orchestration to the auth layer's `withAuth` (refresh-on-401/
+ * empty-403-then-retry-once) rather than touching the session store here — so this module
+ * still never reads tokens directly, it just hands `withAuth` a `(token) => request(...)`.
  */
 
 const BASE = '/api/billing-catalog';
+const ORDERS = '/api/billing/orders';
 
 export const fetchPlans = (signal?: AbortSignal): Promise<PlansResponse> =>
   request(`${BASE}/plans`, { method: 'GET', schema: plansResponseSchema, signal });
@@ -35,3 +43,17 @@ export const fetchPayAsYouGoDays = (
     signal,
   });
 };
+
+/**
+ * `POST /api/billing/orders` — create a pending order and get its `checkoutUrl`
+ * (monetization-api.md §4.3). Authed: `withAuth` supplies the bearer and handles the
+ * 401/empty-403 refresh+retry. The 409 lost-race retry lives at the mutation layer
+ * (`useCreateOrder`) so this stays a single pure call.
+ */
+export const createOrder = (
+  body: CreateOrderRequest,
+  signal?: AbortSignal,
+): Promise<OrderDetails> =>
+  withAuth((token) =>
+    request(ORDERS, { method: 'POST', body, token, schema: orderDetailsSchema, signal }),
+  );

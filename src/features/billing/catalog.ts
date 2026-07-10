@@ -74,6 +74,7 @@ export interface PlanView {
   badge?: string;
   badgeStyle?: 'accent' | 'muted';
   amount: number; // raw amount (unformatted), e.g. for pre-filling an input
+  durationDays: number | null; // null for PER_DAY; the fixed span for a FIXED plan
   price: string; // e.g. "150,000" — grouping only
   unit: string; // FIXED → `${currency} / ${durationDays} days`; PER_DAY → `${currency} / day`
   desc: string;
@@ -129,6 +130,7 @@ export function buildPlanViews(data?: PlansResponse): PlanView[] {
           badge: copy.badge,
           badgeStyle: copy.badgeStyle,
           amount,
+          durationDays,
           price: groupFmt.format(amount),
           unit,
           desc: copy.desc,

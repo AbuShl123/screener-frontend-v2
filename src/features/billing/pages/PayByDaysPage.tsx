@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMe } from '@/features/auth';
 import { BillingHeader } from '../components/BillingHeader';
 import { buildPlanViews } from '../catalog';
 import { useDebouncedValue } from '../useDebouncedValue';
@@ -13,7 +14,8 @@ const groupFmt = new Intl.NumberFormat('en-US');
  * top-up editor, from the "Pay by Days" design template trimmed to the minimal
  * breakdown (plan §7): the `{ days }` response can only populate a day count + an
  * "Access until" line, so the template's daily-rate / you-pay / leftover rows are
- * dropped. "Continue to payment" navigates to / (no real charge yet, §9).
+ * dropped. "Continue to payment" carries the entered amount to the Payment Method page
+ * (`/billing/payment?plan=pay_as_you_go&amount=N`), which creates the order.
  *
  * Amount model (plan §2): raw digit string in state, non-digits stripped, capped at
  * 12 digits, displayed grouped. Zero/empty never calls the API (the `enabled` guard in
@@ -29,6 +31,7 @@ const groupFmt = new Intl.NumberFormat('en-US');
 export function PayByDaysPage() {
   const { data: plansData } = usePlans();
   const paygPlan = buildPlanViews(plansData).find((p) => p.code === 'pay_as_you_go');
+  const me = useMe();
 
   // Defaults to the current per-day rate (fallback-first, like the rest of the catalog) so
   // the page isn't blank on first load — the user still sees a days/access-until result.
@@ -49,7 +52,11 @@ export function PayByDaysPage() {
 
   let accessUntil: string | null = null;
   if (days != null && days >= 1) {
-    const end = new Date();
+    const now = new Date();
+    const currentExpiry = me.data?.accessExpiresAt ? new Date(me.data.accessExpiresAt) : null;
+    // Top up extends from the existing expiry if it hasn't lapsed yet, not from today.
+    const base = currentExpiry && currentExpiry > now ? currentExpiry : now;
+    const end = new Date(base);
     end.setDate(end.getDate() + days);
     accessUntil = end.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
   }
@@ -208,7 +215,7 @@ export function PayByDaysPage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(`/billing/payment?plan=pay_as_you_go&amount=${amount}`)}
             disabled={!canContinue}
             className="rounded-[8px] border border-warning bg-warning px-[22px] py-[13px] font-sans text-[15px]
                        font-medium leading-none text-[#1a1206] transition-[filter] duration-150

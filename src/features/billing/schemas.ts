@@ -34,3 +34,55 @@ export const payAsYouGoDaysSchema = z.object({
   days: z.number().int().nonnegative(),
 });
 export type PayAsYouGoDays = z.infer<typeof payAsYouGoDaysSchema>;
+
+/**
+ * Order lifecycle status (monetization-api.md §3). Permissive by design — this is a
+ * server-authored enum; a stricter/narrower client copy would only manufacture false
+ * contract-drift failures on a value we don't act on this phase (we only branch on
+ * `checkoutUrl`).
+ */
+export const orderStatusSchema = z.enum([
+  'CREATED',
+  'PENDING',
+  'PAID',
+  'EXPIRED',
+  'FAILED',
+  'CANCELED',
+  'REVERTED',
+]);
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
+
+/**
+ * `OrderDetailsEntry` — the `POST /api/billing/orders` (and future `orders/current`)
+ * response (monetization-api.md §4.3). Only `checkoutUrl` / `status` / `orderId` are
+ * consumed this phase; the rest are validated but loosely (server-authored fields,
+ * nullable where the backend leaves them unset before payment) so contract drift on an
+ * unused field can't blow up the create-order flow.
+ */
+export const orderDetailsSchema = z.object({
+  orderId: z.string(),
+  status: orderStatusSchema,
+  planCode: z.string(),
+  amount: z.number(),
+  accessDurationSeconds: z.number(),
+  currency: z.string(),
+  provider: z.string(),
+  reason: z.string().nullable(),
+  reasonDetail: z.string().nullable(),
+  checkoutUrl: z.string().nullable(),
+  providerUuid: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  paidAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type OrderDetails = z.infer<typeof orderDetailsSchema>;
+
+/**
+ * `POST /api/billing/orders` request body. Send only `planCode` (fixed plans) or
+ * `planCode` + `amount` (pay-as-you-go). `amount` is a STRING in major units (avoids
+ * double-precision loss); never send price/currency — the server resolves those.
+ */
+export interface CreateOrderRequest {
+  planCode: string;
+  amount?: string;
+}

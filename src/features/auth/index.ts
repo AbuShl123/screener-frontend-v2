@@ -5,6 +5,7 @@ export {
   fetchMe,
   logout,
   refreshTokens,
+  withAuth,
 } from './session';
 
 // React Query ownership of /me + the login/register/resend/verify mutations

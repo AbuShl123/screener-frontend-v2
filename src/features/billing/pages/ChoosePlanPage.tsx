@@ -7,8 +7,8 @@ import { usePlans } from '../queries';
 /**
  * Choose Plan (`/billing/plans`, behind ProtectedRoute). Mirrors the "Choose Plan"
  * design template. Clicking a card navigates immediately:
- *  - `pay_as_you_go` → /billing/pay-by-days
- *  - every other plan → / (placeholder; the payment-method page isn't built yet, §9).
+ *  - `pay_as_you_go` → /billing/pay-by-days (the top-up editor)
+ *  - every other plan → /billing/payment?plan=CODE (the Payment Method page).
  *
  * Fallback-first like `PricingSection`: `buildPlanViews(data)` renders all four cards
  * instantly from hardcoded fallbacks, and live amounts swap in when `usePlans` resolves.
@@ -20,7 +20,7 @@ export function ChoosePlanPage() {
 
   function onChoose(code: string) {
     if (code === 'pay_as_you_go') navigate('/billing/pay-by-days');
-    else navigate('/'); // placeholder: payment-method page not built yet (§9)
+    else navigate(`/billing/payment?plan=${code}`);
   }
 
   return (

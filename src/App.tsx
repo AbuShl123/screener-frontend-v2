@@ -4,7 +4,12 @@ import { SessionGate } from '@/app/SessionGate';
 import { ProtectedRoute } from '@/app/ProtectedRoute';
 import { PublicRoute } from '@/app/PublicRoute';
 import { DashboardPage } from '@/features/orderbook';
-import { CheckoutStubPage, ChoosePlanPage, PayByDaysPage } from '@/features/billing';
+import {
+  CheckoutStubPage,
+  ChoosePlanPage,
+  PayByDaysPage,
+  PaymentMethodPage,
+} from '@/features/billing';
 import { LandingPage } from '@/features/landing';
 
 /**
@@ -50,6 +55,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <PayByDaysPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing/payment"
+          element={
+            <ProtectedRoute>
+              <PaymentMethodPage />
             </ProtectedRoute>
           }
         />

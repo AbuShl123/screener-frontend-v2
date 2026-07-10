@@ -143,11 +143,12 @@ export function refreshTokens(): Promise<void> {
  * Wrap a token-taking api fn so a 401/empty-403 triggers one refresh + retry.
  * Proactive refresh should make this rare; the doc wants it as a backstop.
  *
- * The 403 inclusion is safe: only `/me` and `/logout` go through `withAuth`, and for
- * those a 403 is Spring Security's empty-body bearer rejection — NOT the login-flow
- * "email not verified" 403 (login never goes through withAuth).
+ * The 403 inclusion is safe: the callers that go through `withAuth` (`/me`, `/logout`,
+ * and billing's authed order POST) treat a 403 as Spring Security's empty-body bearer
+ * rejection — NOT the login-flow "email not verified" 403 (login never goes through
+ * withAuth). Any endpoint routed through here must share that empty-403 contract.
  */
-async function withAuth<T>(fn: (token: string) => Promise<T>): Promise<T> {
+export async function withAuth<T>(fn: (token: string) => Promise<T>): Promise<T> {
   const token = useSession.getState().accessToken;
   if (!token) {
     hardLogout();
