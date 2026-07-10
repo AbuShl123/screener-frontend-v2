@@ -12,7 +12,7 @@
 >   `TickerStrip` — all of which already exist in [`src/components/`](../../src/components/).
 > - CLAUDE.md — the routing model, the one-way feature-module dependency flow, the "dark theme,
 >   semantic tokens, no raw hex" styling rule, the data-flow split (TanStack Query for REST).
-> - The backend billing catalog contract (`GET /api/billing/plans`), supplied by the product owner
+> - The backend billing catalog contract (`GET /api/billing-catalog/plans`), supplied by the product owner
 >   and reproduced in §6.
 
 ## 1. Scope
@@ -29,7 +29,7 @@ Build the public marketing / advertising home page and make it the app's front d
   Create account / Start free trial → `/register`, "Start now" on a plan → checkout (authed) or
   `/register` (anon).
 - A **billing data layer** (`src/features/billing/`): a typed, public `usePlans()` query over
-  `GET /api/billing/plans`, plus a plan-presentation catalog that merges live prices with copy
+  `GET /api/billing-catalog/plans`, plus a plan-presentation catalog that merges live prices with copy
   hardcoded by plan `code`.
 - A **stub checkout route** `/billing/checkout?plan=CODE` so the authed "Start now" path is really
   wired even though the payment flow itself is out of scope.
@@ -187,7 +187,7 @@ The landing page is the first consumer of billing, so this module is created now
 module's exact shape: `schemas.ts` (server-response Zod) → `api.ts` (pure functions over `request()`)
 → `queries.ts` (React Query).
 
-**Contract** (`GET /api/billing/plans`, **public — no JWT**):
+**Contract** (`GET /api/billing-catalog/plans`, **public — no JWT**):
 
 ```jsonc
 {
@@ -219,7 +219,7 @@ export type Plan = z.infer<typeof planSchema>;
 export type PlansResponse = z.infer<typeof plansResponseSchema>;
 ```
 
-**`api.ts`** — `fetchPlans(signal?) => request('/api/billing/plans', { schema: plansResponseSchema, signal })`.
+**`api.ts`** — `fetchPlans(signal?) => request('/api/billing-catalog/plans', { schema: plansResponseSchema, signal })`.
 No `token` argument: this endpoint is public, so it stays outside the `withAuth` machinery entirely.
 
 **`queries.ts`**:

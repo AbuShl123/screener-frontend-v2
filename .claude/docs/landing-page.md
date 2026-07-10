@@ -20,7 +20,7 @@ Two feature modules cooperate:
 | Module | Path | Responsibility |
 |---|---|---|
 | `landing` | [`src/features/landing/`](../../src/features/landing/) | The page, its sections, and auth-aware navigation. Pure presentation + routing. |
-| `billing` | [`src/features/billing/`](../../src/features/billing/) | The `GET /api/billing/plans` data layer + the plan-presentation catalog + the stub checkout page. |
+| `billing` | [`src/features/billing/`](../../src/features/billing/) | The `GET /api/billing-catalog/plans` data layer + the plan-presentation catalog + the stub checkout page. |
 
 `landing` may import `billing`'s public barrel; **`billing` never imports `landing`.** The dependency
 flow is one-way, mirroring the auth module (per CLAUDE.md):
@@ -108,7 +108,7 @@ module's exact shape.
 
 ### 4.1 The pipeline
 
-- **[`schemas.ts`](../../src/features/billing/schemas.ts)** — Zod for the `GET /api/billing/plans`
+- **[`schemas.ts`](../../src/features/billing/schemas.ts)** — Zod for the `GET /api/billing-catalog/plans`
   response (the single source of both validator and TS type, per CLAUDE.md's REST rule). Server-authored
   fields (`code`, `displayName`, `currency`) are deliberately not over-constrained.
 - **[`api.ts`](../../src/features/billing/api.ts)** — `fetchPlans(signal?)` over `request()`. The
@@ -119,7 +119,7 @@ module's exact shape.
   rarely). `billingKeys` for cache addressing.
 - **[`catalog.ts`](../../src/features/billing/catalog.ts)** — the presentation bridge (§4.2).
 
-Contract (`GET /api/billing/plans`, public):
+Contract (`GET /api/billing-catalog/plans`, public):
 
 ```jsonc
 {
