@@ -10,10 +10,12 @@ classified, and handles subscription access/payments. React 19 + TypeScript SPA 
 no SSR meta-framework.
 
 **Current state:** auth (register → verify-email → login → session bootstrap → route guards →
-logout), the live order book dashboard (WS feed → Zustand store → cards + notifications panel +
-cooldown-deduped alerts), and the public landing page + billing plans/checkout-stub data layer are
-all built. Not yet started: classification rules CRUD, real payment flow (checkout is a stub),
-charts.
+logout), the live order book dashboard (WS feed → Zustand store → cards + sort menu + notifications
+panel + cooldown-deduped alerts), classification rules CRUD, client-side notification preferences
+(minimum tier + muted tickers), the public landing page, and the full payment/monetization flow
+(plan catalog → checkout redirect → polling-based payment status → account page + billing history)
+are all built. Not yet started: charts. An i18n (English/Russian) rollout is designed but not
+implemented — see [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md).
 
 ## Commands
 
@@ -129,7 +131,8 @@ src/
   lib/         shared infra: queryClient.ts, api/ (auth-agnostic REST client), ws/feedClient.ts (socket singleton)
   app/         app shell: routed guards + bootstrap gate (SessionGate, ProtectedRoute, PublicRoute)
   stores/      real-time state that lives OUTSIDE React — orderbookStore, notificationStore
-  features/    feature modules: auth, orderbook (dashboard), billing, landing (rules not yet started)
+  features/    feature modules: auth, orderbook (dashboard), billing (plans/checkout/account), settings
+               (classification rules + notification prefs), landing
   components/  shared UI primitives (Button, TextField, PasswordField, Card, Banner, BrandMark, …) + layouts/
 ```
 
@@ -142,8 +145,9 @@ src/
   Query's `useMe` loading state (`status === 'authenticated' && me.isLoading`), *not* a third Zustand
   status — the token store stays tokens-only.
 - **`ProtectedRoute`** — redirects anonymous visitors to `/login`. Gating is **token-presence only**,
-  it does NOT read `accessState` (paid-feature gating comes later). Wraps `/dashboard` and
-  `/billing/checkout`.
+  it does NOT read `accessState` — wraps `/dashboard`, `/account`, `/account/billing-history`, and
+  every `/billing/*` route, but none of them individually re-check subscription access beyond that
+  (see the Monetization note on advisory-only gating below).
 - **`PublicRoute`** — bounces an already-authenticated user off `/login` and `/register`.
 - `/` (the landing page) and `/verify-email` / `/register/check-inbox` are unguarded in any auth
   state — the landing page self-adapts to auth state instead of redirecting (see
@@ -204,36 +208,98 @@ public surface; nothing outside the feature reaches into its internals).
 
 ### Billing feature module (`src/features/billing/`)
 
-Public plan catalog (`GET /api/billing-catalog/plans`, no JWT) consumed by both the landing page's pricing
-section and (eventually) an in-app upgrade flow — `catalog.ts` deliberately lives in `billing`, not
-`landing`, for that reuse. `CheckoutStubPage` is a placeholder for the real hosted-payment redirect
-described in the Monetization feature below; it is not the final implementation.
+Public plan catalog (`GET /api/billing-catalog/plans`, no JWT) consumed by both the landing page's
+pricing section and the in-app paywall — `catalog.ts` deliberately lives in `billing`, not
+`landing`, for that reuse. Fallback-first rendering there (hardcoded price/type/duration per plan
+code merged with live data) is the reference pattern for conventional-screen work; reuse it rather
+than adding spinners for data that has a sane default.
+
+The full purchase flow is built: `ChoosePlanPage` (plan catalog + pay-as-you-go amount entry) →
+`PayByDaysPage` / `PaymentMethodPage` → `POST /api/billing/orders` → redirect to the provider's
+(Multicard) hosted `checkoutUrl` → `PaymentStatusPage` (the `return_url` target). The critical
+mental model, straight from the backend contract: **the browser's return from checkout proves
+nothing** — the backend only grants access via a server-to-server callback (or a reconciliation
+sweep), so `PaymentStatusPage`/`usePaymentStatus.ts` resolve the outcome purely by polling
+`GET /api/billing/orders/current` until it lands on a terminal status, never by trusting the
+redirect. `CheckoutStubPage` (`/billing/checkout`) predates the real flow and is now stale — it makes no
+network calls and its own comment calls it a placeholder — but it's still routed; don't treat it as
+part of the current purchase flow.
+
+`AccountPage` + `BillingHistoryPage` (orders + entitlement-ledger tabs) share `AccountLayout`, a
+sidebar shell separate from the dashboard chrome. `historyView.ts` holds the code→label/color maps
+(`STATUS`, `REASON`, `SOURCE`) for rendering backend enums — the same "map server codes to display
+metadata in a small colocated module" pattern used by `catalog.ts`; extend those maps rather than
+switching on the raw enum inline in JSX.
+
+Full endpoint contract: [`.claude/docs/monetization-api.md`](.claude/docs/monetization-api.md).
+Flow/UX rationale and the negative-path table (cancelled payment, lost tab, retried order, etc.):
+[`.claude/docs/payment-flow-frontend.md`](.claude/docs/payment-flow-frontend.md).
+
+### Settings feature module (`src/features/settings/`)
+
+Two independent concerns share this module, both surfaced through `SettingsModal` (opened from the
+dashboard header, not a routed page):
+
+- **Classification rules** (`ClassificationRules.tsx`, `RuleEditor.tsx`, `CustomRulesList.tsx`,
+  `rulesValidation.ts`) — per-`(symbol, market)` CRUD over the tier thresholds that decide which
+  order book levels get highlighted. Server-backed via `api.ts` (`GET /api/rules/default`,
+  `GET/PUT/DELETE /api/rules`), read/written through `queries.ts` (TanStack Query) — a conventional
+  CRUD screen, not the real-time pattern. `rulesValidation.ts` mirrors the backend's per-tier checks
+  client-side so bad input gets instant feedback instead of a round-tripped `400`. Requires an
+  active subscription (a JSON-body 403 gate, distinct from the empty-body auth 403 — see
+  `UpgradeNote.tsx`). Domain model and thresholds:
+  [`.claude/docs/classification-rule-api.md`](.claude/docs/classification-rule-api.md).
+- **Notification preferences** (`NotificationsSettings.tsx`, `MinimumTierControl.tsx`,
+  `MutedTickers.tsx`, `notificationSettingsStore.ts`) — minimum tier + muted book keys. **Client-side
+  only** (persisted to localStorage via `storage.ts`, no backend endpoint). The store is
+  framework-agnostic (plain Zustand `create`, no React coupling) and hydrated at module load
+  specifically so `feedClient.ts` can read it synchronously via `getState()` on the flush hot path
+  to filter which notifications get raised — same outside-React shape as `session.ts` and
+  `orderbookStore.ts`.
 
 ## Features (high-level landscape)
 
 1. **Auth** — ✅ built. Register/verify/login/session/logout.
 2. **Order book** — ✅ built (flagship, performance-critical). Live, continuously-updated order
    books; detects meaningful changes (new/removed significant orders) and surfaces them as
-   notifications. Spoken/TTS alerts are not yet implemented. Governed by the real-time architecture
-   above. Socket protocol: [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md).
-3. **Classification rules** — not started. Per-user CRUD for the thresholds that drive how order
-   book levels are ranked/analyzed. Conventional forms-and-data work validated against backend rules.
-4. **Monetization & access** — plan catalog + landing pricing section built; checkout is a stub.
-   Still to build: the real hosted-payment redirect and reflecting access state back to the user by
-   **polling** for payment outcome rather than trusting the browser redirect.
+   notifications, with a sort menu and per-user mute/tier filtering (see Settings below). Spoken/TTS
+   alerts are not yet implemented. Governed by the real-time architecture above. Socket protocol:
+   [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md).
+3. **Classification rules** — ✅ built. Per-user CRUD for the tier thresholds that drive how order
+   book levels are ranked/highlighted. Conventional forms-and-data work validated against backend
+   rules (client-side mirror in `rulesValidation.ts`).
+4. **Monetization & access** — ✅ built. Plan catalog, pay-as-you-go, hosted-checkout redirect,
+   polling-based payment status resolution, account page, and billing/entitlement history. Note the
+   access **gate itself is advisory-only client-side** — the backend doesn't yet enforce entitlement
+   on REST/WS, per `monetization-api.md` §4.2.
 5. **Charts** — future work, most likely built on TradingView Lightweight Charts. Not yet scoped.
+6. **i18n (English/Russian)** — designed, not implemented. `react-i18next`, browser-language
+   detection, feature-mirrored namespaces. Full inventory + rollout phasing in
+   [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md) before starting any
+   extraction work.
 
 ## Reference docs
 
 - [`.claude/docs/auth-api.md`](.claude/docs/auth-api.md) — full auth API contract.
 - [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md) — the `/ws` socket
   protocol: connection, token-as-query-param, every message type and payload shape.
+- [`.claude/docs/classification-rule-api.md`](.claude/docs/classification-rule-api.md) — the tier
+  model (notional × distance thresholds) and the per-user custom-rule CRUD contract.
+- [`.claude/docs/monetization-api.md`](.claude/docs/monetization-api.md) — endpoint-level contract
+  for plans, entitlement, and orders (enums, request/response shapes, status codes).
+- [`.claude/docs/payment-flow-frontend.md`](.claude/docs/payment-flow-frontend.md) — the narrative
+  UX flow built on top of that contract: page transitions, polling/timeout behavior, and the full
+  negative-path table (cancelled/lost/retried payments).
+- [`.claude/docs/billing-history-api.md`](.claude/docs/billing-history-api.md) — order history and
+  entitlement-ledger endpoints backing `BillingHistoryPage`.
 - [`.claude/docs/frontend-architecture.md`](.claude/docs/frontend-architecture.md) — the high-level
   "what and why" of the frontend direction (a proposed default, not a locked mandate).
 - [`.claude/docs/landing-page.md`](.claude/docs/landing-page.md) — how the public landing page +
   billing data layer are built: module shape, routing, the plans data flow, and design-token usage.
 - [`.claude/plans/`](.claude/plans/) — phase-by-phase implementation plans for each feature as it
   was built; useful for the *why* behind a design decision that isn't obvious from the code alone.
+  [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md) is a proposed plan, not
+  a build log — nothing in it is implemented yet.
 
 ## Working conventions
 
