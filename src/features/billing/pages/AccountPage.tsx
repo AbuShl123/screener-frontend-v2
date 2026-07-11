@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BrandMark } from '@/components/BrandMark';
 import { Button } from '@/components/Button';
-import { logout, useMe, type UserProfile } from '@/features/auth';
+import { useMe, type UserProfile } from '@/features/auth';
 import { buildPlanViews } from '../catalog';
+import { AccountLayout } from '../components/AccountLayout';
+import { fmtDate } from '../historyView';
 import { useCancelOrder, useLatestOrder, usePlans } from '../queries';
 import type { OrderDetails } from '../schemas';
 
@@ -17,14 +18,6 @@ const HERO = {
   warning: 'var(--color-warning)',
   danger: 'var(--color-danger)',
 } as const;
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 /** Whole days remaining until `iso` (rounded up, floored at 0). */
 function daysUntil(iso: string): number {
@@ -135,133 +128,47 @@ export function AccountPage() {
   const { data: plansData } = usePlans();
   const cancelOrder = useCancelOrder();
 
-  const [loggingOut, setLoggingOut] = useState(false);
-  async function onSignOut() {
-    setLoggingOut(true);
-    await logout();
-    navigate('/login', { replace: true });
-  }
-
-  const hasAccess = profile ? profile.accessState !== 'EXPIRED' : false;
   const accessView = profile ? buildAccessView(profile) : null;
   const pendingOrder = order?.status === 'PENDING' ? order : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg font-sans text-text-secondary">
-      {/* ===== Top bar ===== */}
-      <header className="flex flex-none items-center justify-between border-b border-border-subtle px-6 py-[14px]">
-        <BrandMark />
-        {hasAccess && (
-          <Button
-            variant="primary"
-            fullWidth={false}
-            onClick={() => navigate('/dashboard')}
-            className="inline-flex items-center gap-2 !py-3"
-          >
-            Go to dashboard
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.25"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="flex-none"
-            >
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </Button>
-        )}
-      </header>
+    <AccountLayout>
+      <div className="flex max-w-[1100px] flex-wrap items-start gap-6 p-10">
+        {/* Left column */}
+        <div className="flex min-w-0 flex-[1_1_460px] flex-col gap-5">
+          {pendingOrder && (
+            <UnpaidInvoiceCard
+              order={pendingOrder}
+              planName={
+                buildPlanViews(plansData).find((p) => p.code === pendingOrder.planCode)?.name ??
+                pendingOrder.planCode
+              }
+              cancelling={cancelOrder.isPending}
+              onRetry={() => {
+                if (pendingOrder.checkoutUrl) window.location.assign(pendingOrder.checkoutUrl);
+                else navigate('/billing/plans');
+              }}
+              onChoosePlan={() => navigate('/billing/plans')}
+              onCancel={() => cancelOrder.mutate()}
+            />
+          )}
 
-      <div className="flex min-h-0 flex-1">
-        {/* ===== Left nav ===== */}
-        <nav className="flex w-56 flex-none flex-col gap-[2px] border-r border-border-subtle py-5">
-          <div className="flex items-center border-l-2 border-accent bg-accent/[0.08] py-[11px] pl-5 pr-[22px] text-[14px] font-medium text-text">
-            Account
-          </div>
-          {['Billing history', 'Security', 'Settings'].map((label) => (
-            <div
-              key={label}
-              className="flex cursor-pointer items-center border-l-2 border-transparent py-[11px] pl-5 pr-[22px]
-                         text-[14px] text-text-muted transition-colors hover:text-text"
-            >
-              {label}
-            </div>
-          ))}
-          <div className="flex-1" />
-          <div className="mt-2 border-t border-border-subtle px-[22px] pt-2">
-            <button
-              type="button"
-              onClick={onSignOut}
-              disabled={loggingOut}
-              className="flex items-center gap-[9px] border-l-2 border-transparent py-[11px] pl-5 text-[14px]
-                         text-danger/70 transition-colors hover:text-danger disabled:cursor-not-allowed
-                         disabled:opacity-50"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="flex-none"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              {loggingOut ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
-        </nav>
+          {accessView && (
+            <AccessCard view={accessView} onPrimary={() => navigate('/billing/plans')} />
+          )}
 
-        {/* ===== Main content ===== */}
-        <main className="min-w-0 flex-1 overflow-auto">
-          <div className="flex max-w-[1100px] flex-wrap items-start gap-6 p-10">
-            {/* Left column */}
-            <div className="flex min-w-0 flex-[1_1_460px] flex-col gap-5">
-              {pendingOrder && (
-                <UnpaidInvoiceCard
-                  order={pendingOrder}
-                  planName={
-                    buildPlanViews(plansData).find((p) => p.code === pendingOrder.planCode)?.name ??
-                    pendingOrder.planCode
-                  }
-                  cancelling={cancelOrder.isPending}
-                  onRetry={() => {
-                    if (pendingOrder.checkoutUrl) window.location.assign(pendingOrder.checkoutUrl);
-                    else navigate('/billing/plans');
-                  }}
-                  onChoosePlan={() => navigate('/billing/plans')}
-                  onCancel={() => cancelOrder.mutate()}
-                />
-              )}
+          <AccountInfoCard
+            email={profile?.email ?? '—'}
+            fullName={profile ? `${profile.firstName} ${profile.lastName}` : '—'}
+            role={profile?.role ?? '—'}
+            registeredAt={profile?.registeredAt}
+          />
+        </div>
 
-              {accessView && (
-                <AccessCard view={accessView} onPrimary={() => navigate('/billing/plans')} />
-              )}
-
-              <AccountInfoCard
-                email={profile?.email ?? '—'}
-                fullName={profile ? `${profile.firstName} ${profile.lastName}` : '—'}
-                role={profile?.role ?? '—'}
-                registeredAt={profile?.registeredAt}
-              />
-            </div>
-
-            {/* Right column */}
-            <PayByDaysCard plansData={plansData} />
-          </div>
-        </main>
+        {/* Right column */}
+        <PayByDaysCard plansData={plansData} />
       </div>
-    </div>
+    </AccountLayout>
   );
 }
 

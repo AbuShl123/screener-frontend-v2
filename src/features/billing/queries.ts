@@ -6,6 +6,9 @@ import {
   cancelCurrentOrder,
   createOrder,
   fetchCurrentOrder,
+  fetchEntitlementHistory,
+  fetchOrderHistory,
+  fetchOrders,
   fetchPlans,
   fetchPayAsYouGoDays,
 } from './api';
@@ -25,6 +28,9 @@ export const billingKeys = {
   plans: ['billing', 'plans'] as const,
   paygDays: (amount: number) => ['billing', 'payg-days', amount] as const,
   currentOrder: ['billing', 'orders', 'current'] as const,
+  orders: ['billing', 'orders', 'list'] as const,
+  orderHistory: (id: string) => ['billing', 'orders', id, 'history'] as const,
+  entitlementHistory: ['billing', 'entitlement', 'history'] as const,
 };
 
 export function usePlans() {
@@ -109,6 +115,8 @@ export function useLatestOrder() {
  * invoice card clears immediately) and invalidate `/me` — a payment that landed just before the
  * cancel can still flip the order to `PAID`, so access state is re-fetched rather than assumed.
  * On a 409/404 (order no longer `PENDING`, or gone) we refetch `orders/current` to reconcile.
+ * Either way the `orders` list is invalidated too, so a cancel triggered from a Billing-history
+ * row re-lists that order in its new state.
  */
 export function useCancelOrder() {
   return useMutation({
@@ -116,9 +124,53 @@ export function useCancelOrder() {
     onSuccess: (order) => {
       queryClient.setQueryData(billingKeys.currentOrder, order);
       queryClient.invalidateQueries({ queryKey: authKeys.me });
+      queryClient.invalidateQueries({ queryKey: billingKeys.orders });
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: billingKeys.currentOrder });
+      queryClient.invalidateQueries({ queryKey: billingKeys.orders });
     },
+  });
+}
+
+/**
+ * The caller's full order audit trail for the Billing-history Payments tab
+ * (`GET /api/billing/orders`). `retry: false` (a 403 = no session, not worth retrying) and a
+ * modest `staleTime` — the list changes only when the user starts/settles an order.
+ */
+export function useOrders() {
+  return useQuery({
+    queryKey: billingKeys.orders,
+    queryFn: ({ signal }) => fetchOrders(signal),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/**
+ * The entitlement ledger for the Billing-history Access-grants tab
+ * (`GET /api/billing/entitlement/history`). Same options as `useOrders`.
+ */
+export function useEntitlementHistory() {
+  return useQuery({
+    queryKey: billingKeys.entitlementHistory,
+    queryFn: ({ signal }) => fetchEntitlementHistory(signal),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/**
+ * One order's status-transition timeline (`GET /orders/{id}/history`), lazy: `enabled` flips
+ * true only on the first expand of that order's row, so we fetch a history at most once per
+ * opened row. A terminal order's history is immutable, hence the long `staleTime`.
+ */
+export function useOrderHistory(orderId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: billingKeys.orderHistory(orderId),
+    queryFn: ({ signal }) => fetchOrderHistory(orderId, signal),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
   });
 }

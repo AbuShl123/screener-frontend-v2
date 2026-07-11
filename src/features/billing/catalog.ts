@@ -66,6 +66,15 @@ const PLAN_COPY: Record<string, PlanCopy> = {
   },
 };
 
+/**
+ * Plan code → display name, derived from the copy catalog so the four known plans'
+ * labels live in one place. Reused by the billing-history page to render a readable
+ * plan name instead of the raw `planCode`.
+ */
+export const PLAN_NAMES: Record<string, string> = Object.fromEntries(
+  Object.entries(PLAN_COPY).map(([code, copy]) => [code, copy.name]),
+);
+
 /** Everything a `PlanCard` needs, all derived here (§7). */
 export interface PlanView {
   code: string;

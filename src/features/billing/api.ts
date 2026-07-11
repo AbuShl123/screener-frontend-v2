@@ -4,9 +4,14 @@ import {
   plansResponseSchema,
   payAsYouGoDaysSchema,
   orderDetailsSchema,
+  ordersListSchema,
+  orderHistorySchema,
+  entitlementHistorySchema,
   type PlansResponse,
   type PayAsYouGoDays,
   type OrderDetails,
+  type OrderHistoryEntry,
+  type EntitlementLedgerEntry,
   type CreateOrderRequest,
 } from './schemas';
 
@@ -89,6 +94,52 @@ export const cancelCurrentOrder = (signal?: AbortSignal): Promise<OrderDetails> 
       method: 'POST',
       token,
       schema: orderDetailsSchema,
+      signal,
+    }),
+  );
+
+/**
+ * `GET /api/billing/orders` — the caller's full order audit trail, newest first
+ * (billing-history-api.md). Authed via `withAuth`, same refresh-on-401/empty-403 shape as
+ * `fetchCurrentOrder`. Returns `[]` naturally for a user with no orders — no 404 case here,
+ * so (unlike `fetchCurrentOrder`) nothing is null-coalesced.
+ */
+export const fetchOrders = (signal?: AbortSignal): Promise<OrderDetails[]> =>
+  withAuth((token) =>
+    request(ORDERS, { method: 'GET', token, schema: ordersListSchema, signal }),
+  );
+
+/**
+ * `GET /api/billing/orders/{id}/history` — one order's status-transition audit trail, newest
+ * first (billing-history-api.md). Owner-only; a 404 shouldn't occur for a row we just listed,
+ * so it's left to throw (no null-coalescing). Authed via `withAuth`.
+ */
+export const fetchOrderHistory = (
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<OrderHistoryEntry[]> =>
+  withAuth((token) =>
+    request(`${ORDERS}/${orderId}/history`, {
+      method: 'GET',
+      token,
+      schema: orderHistorySchema,
+      signal,
+    }),
+  );
+
+/**
+ * `GET /api/billing/entitlement/history` — the caller's entitlement ledger, newest first
+ * (billing-history-api.md). Authed via `withAuth`. Returns `[]` naturally (though every user
+ * normally has at least a `TRIAL` row).
+ */
+export const fetchEntitlementHistory = (
+  signal?: AbortSignal,
+): Promise<EntitlementLedgerEntry[]> =>
+  withAuth((token) =>
+    request(`/api/billing/entitlement/history`, {
+      method: 'GET',
+      token,
+      schema: entitlementHistorySchema,
       signal,
     }),
   );

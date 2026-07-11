@@ -78,6 +78,51 @@ export const orderDetailsSchema = z.object({
 export type OrderDetails = z.infer<typeof orderDetailsSchema>;
 
 /**
+ * `GET /api/billing/orders` — the caller's own orders, newest first (billing-history-api.md).
+ * Same `OrderDetailsEntry` shape as the single-order endpoints; empty array is a valid,
+ * normal response (a user who never created an order).
+ */
+export const ordersListSchema = z.array(orderDetailsSchema);
+
+/**
+ * One row of `GET /api/billing/orders/{id}/history` — a single status transition of an order
+ * (billing-history-api.md). `source` (`API`|`CALLBACK`|`RECONCILIATION`|`SYSTEM`) stays a
+ * permissive `z.string()`, per the file's rule for server-authored vocab we only map through
+ * a lookup — a strict client enum would only manufacture false contract drift.
+ */
+export const orderHistoryEntrySchema = z.object({
+  fromStatus: orderStatusSchema,
+  toStatus: orderStatusSchema,
+  reason: z.string().nullable(),
+  reasonDetail: z.string().nullable(),
+  source: z.string(),
+  createdAt: z.string(),
+  seq: z.number(),
+});
+export type OrderHistoryEntry = z.infer<typeof orderHistoryEntrySchema>;
+
+export const orderHistorySchema = z.array(orderHistoryEntrySchema);
+
+/**
+ * One row of `GET /api/billing/entitlement/history` — the entitlement ledger, every event that
+ * pushed `accessExpiresAt` forward (billing-history-api.md). `order` is the full embedded
+ * `OrderDetailsEntry` for a `PURCHASE` grant, `null` for `TRIAL`/`ADMIN`. `source`
+ * (`TRIAL`|`PURCHASE`|`ADMIN`) is permissive for the same reason as above.
+ */
+export const entitlementLedgerEntrySchema = z.object({
+  source: z.string(),
+  grantedDurationSeconds: z.number(),
+  previousExpiresAt: z.string().nullable(),
+  newExpiresAt: z.string(),
+  order: orderDetailsSchema.nullable(),
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type EntitlementLedgerEntry = z.infer<typeof entitlementLedgerEntrySchema>;
+
+export const entitlementHistorySchema = z.array(entitlementLedgerEntrySchema);
+
+/**
  * `POST /api/billing/orders` request body. Send only `planCode` (fixed plans) or
  * `planCode` + `amount` (pay-as-you-go). `amount` is a STRING in major units (avoids
  * double-precision loss); never send price/currency — the server resolves those.

@@ -6,6 +6,7 @@ import { PublicRoute } from '@/app/PublicRoute';
 import { DashboardPage } from '@/features/orderbook';
 import {
   AccountPage,
+  BillingHistoryPage,
   CheckoutStubPage,
   ChoosePlanPage,
   PayByDaysPage,
@@ -41,6 +42,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AccountPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/billing-history"
+          element={
+            <ProtectedRoute>
+              <BillingHistoryPage />
             </ProtectedRoute>
           }
         />
