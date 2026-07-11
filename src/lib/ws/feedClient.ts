@@ -1,7 +1,9 @@
 import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
 import { filterAnnounced, resetCooldown } from '@/features/orderbook/notifications/cooldown';
+import { filterBySettings } from '@/features/orderbook/notifications/settingsFilter';
 import type { FeedMessage, Level, OrderBook } from '@/features/orderbook/types';
+import { useNotificationSettingsStore } from '@/features/settings';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 
@@ -289,7 +291,13 @@ function flush(): void {
   const batch = buffer;
   buffer = [];
   const candidates = useOrderbookStore.getState().applyMessages(batch);
+  // Push-boundary filter: drop muted / below-minTier candidates BEFORE cooldown, so they
+  // never write a cooldown entry (un-muting later lets that order announce fresh) and the
+  // `N NEW` unread counter stays honest. Building the Set per flush is negligible — `muted`
+  // is a handful of entries and `filterBySettings` early-returns when nothing is configured.
+  const { minTier, muted } = useNotificationSettingsStore.getState();
+  const allowed = filterBySettings(candidates, minTier, new Set(muted));
   // Drop repeats of a still-in-cooldown order (top-5 churn re-raises identical levels).
-  const fresh = filterAnnounced(candidates);
+  const fresh = filterAnnounced(allowed);
   if (fresh.length) useNotificationStore.getState().push(fresh);
 }

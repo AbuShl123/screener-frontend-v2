@@ -5,6 +5,7 @@ import { OrderbookCard } from '@/features/orderbook/components/OrderbookCard';
 import { NotificationHandle } from '@/features/orderbook/components/NotificationHandle';
 import { NotificationPanel, PANEL_WIDTH } from '@/features/orderbook/components/NotificationPanel';
 import { useOrderbookFeed } from '@/features/orderbook/useOrderbookFeed';
+import { SettingsModal } from '@/features/settings';
 
 /** Display unit for card notionals. Template default is `$ USD`. */
 export type SizeMode = 'usd' | 'qty';
@@ -28,6 +29,7 @@ export function DashboardPage() {
   // Owned here because TWO things depend on it: the handle's visibility and `<main>`'s
   // right padding. Default open to match the template exactly.
   const [notifOpen, setNotifOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const keys = useOrderbookStore((s) => s.keys);
   const status = useOrderbookStore((s) => s.status);
 
@@ -37,6 +39,8 @@ export function DashboardPage() {
         tickerCount={keys.length}
         sizeMode={sizeMode}
         onSizeModeChange={setSizeMode}
+        onOpenSettings={() => setSettingsOpen(true)}
+        settingsOpen={settingsOpen}
       />
 
       {/* Thin notice so a dead/stalled backend isn't silent (plan §7.1). */}
@@ -66,6 +70,7 @@ export function DashboardPage() {
       {/* Fixed-position overlays — siblings of `<main>`, not inside the grid. */}
       <NotificationHandle open={notifOpen} onOpen={() => setNotifOpen(true)} />
       <NotificationPanel open={notifOpen} sizeMode={sizeMode} onClose={() => setNotifOpen(false)} />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

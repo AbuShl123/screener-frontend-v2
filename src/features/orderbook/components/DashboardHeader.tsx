@@ -9,15 +9,25 @@ interface DashboardHeaderProps {
   /** Current display unit for card notionals — owned by `DashboardPage`. */
   sizeMode: SizeMode;
   onSizeModeChange: (mode: SizeMode) => void;
+  /** Open the Settings overlay (owned by `DashboardPage`). */
+  onOpenSettings: () => void;
+  /** Whether the Settings overlay is open — drives the gear's active styling. */
+  settingsOpen: boolean;
 }
 
 /**
  * Full-width sticky app header (design template "Dashboard"). QTY / $ USD toggle,
- * Log out, and the profile avatar (links to `/account`) are functional; Settings
- * is still an inert placeholder. The dashboard deliberately does NOT block on
- * `/me` — if the profile failed to load, the avatar just falls back to "·".
+ * Settings, Log out, and the profile avatar (links to `/account`) are all functional.
+ * The dashboard deliberately does NOT block on `/me` — if the profile failed to load,
+ * the avatar just falls back to "·".
  */
-export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: DashboardHeaderProps) {
+export function DashboardHeader({
+  tickerCount,
+  sizeMode,
+  onSizeModeChange,
+  onOpenSettings,
+  settingsOpen,
+}: DashboardHeaderProps) {
   const me = useMe();
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -83,13 +93,17 @@ export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: Das
 
       <span className="h-[22px] w-px bg-border" />
 
-      {/* Settings (inert placeholder) */}
+      {/* Settings (opens the overlay; accent border + tinted bg while open) */}
       <button
         type="button"
         title="Settings"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border
-                   border-border-input text-[16px] text-text-secondary transition-colors
-                   hover:bg-white/5 hover:text-text-strong"
+        onClick={onOpenSettings}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border text-[16px]
+                    transition-colors ${
+                      settingsOpen
+                        ? 'border-accent bg-white/5 text-text-strong'
+                        : 'border-border-input text-text-secondary hover:bg-white/5 hover:text-text-strong'
+                    }`}
       >
         ⚙
       </button>
