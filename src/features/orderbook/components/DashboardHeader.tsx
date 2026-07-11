@@ -12,10 +12,10 @@ interface DashboardHeaderProps {
 }
 
 /**
- * Full-width sticky app header (design template "Dashboard"). Only the QTY / $ USD
- * toggle and Log out are functional; Settings and the profile avatar are inert
- * placeholders per the plan. The dashboard deliberately does NOT block on `/me` —
- * if the profile failed to load, the avatar just falls back to "·".
+ * Full-width sticky app header (design template "Dashboard"). QTY / $ USD toggle,
+ * Log out, and the profile avatar (links to `/account`) are functional; Settings
+ * is still an inert placeholder. The dashboard deliberately does NOT block on
+ * `/me` — if the profile failed to load, the avatar just falls back to "·".
  */
 export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: DashboardHeaderProps) {
   const me = useMe();
@@ -106,13 +106,14 @@ export function DashboardHeader({ tickerCount, sizeMode, onSizeModeChange }: Das
         {loggingOut ? 'Signing out…' : 'Log out'}
       </button>
 
-      {/* Profile (inert placeholder; initials from /me when available) */}
+      {/* Profile (initials from /me when available) */}
       <button
         type="button"
         title="Account"
+        onClick={() => navigate('/account')}
         className="inline-flex h-9 w-9 items-center justify-center rounded-full border
                    border-accent/40 bg-accent/[0.18] font-mono text-[12px] font-medium
-                   tracking-[0.04em] text-accent"
+                   tracking-[0.04em] text-accent transition-colors hover:bg-accent/[0.28]"
       >
         {initials}
       </button>

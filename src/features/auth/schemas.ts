@@ -73,6 +73,7 @@ export const userProfileSchema = z.object({
   role: z.enum(['USER', 'ADMIN']),
   accessState: z.enum(['TRIAL', 'ACTIVE', 'EXPIRED', 'ADMIN']),
   accessExpiresAt: z.string().nullable(), // ISO-8601 instant, null for ADMIN
+  registeredAt: z.string(), // ISO-8601 instant
 });
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AccessState = UserProfile['accessState'];

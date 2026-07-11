@@ -123,7 +123,7 @@ function buildAccessView(profile: UserProfile): AccessView {
  *  1. Unpaid-invoice banner — shown when `orders/current` is `PENDING`; retry (→ checkoutUrl),
  *     choose another plan (→ /billing/plans), or cancel (`orders/current/cancel`).
  *  2. Screener-access card — access state / expiry / renew|subscribe CTA (see `buildAccessView`).
- *  3. Account info — email + (placeholder) access source. Registered date omitted (not on /me).
+ *  3. Account info — email, name, role, and registered date.
  *  4. Pay-by-days mini editor — a compact version of PayByDaysPage that hands the entered amount
  *     to the Payment Method page.
  */
@@ -248,7 +248,12 @@ export function AccountPage() {
                 <AccessCard view={accessView} onPrimary={() => navigate('/billing/plans')} />
               )}
 
-              <AccountInfoCard email={profile?.email ?? '—'} />
+              <AccountInfoCard
+                email={profile?.email ?? '—'}
+                fullName={profile ? `${profile.firstName} ${profile.lastName}` : '—'}
+                role={profile?.role ?? '—'}
+                registeredAt={profile?.registeredAt}
+              />
             </div>
 
             {/* Right column */}
@@ -406,7 +411,17 @@ function AccessCard({ view, onPrimary }: { view: AccessView; onPrimary: () => vo
 // Account info
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AccountInfoCard({ email }: { email: string }) {
+function AccountInfoCard({
+  email,
+  fullName,
+  role,
+  registeredAt,
+}: {
+  email: string;
+  fullName: string;
+  role: string;
+  registeredAt: string | undefined;
+}) {
   return (
     <div className="rounded-[10px] border border-border bg-input px-6 pb-[6px] pt-[22px]">
       <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
@@ -418,10 +433,19 @@ function AccountInfoCard({ email }: { email: string }) {
           {email}
         </span>
       </div>
-      {/* Access source left blank for now (not yet surfaced by the API). */}
+      <div className="flex items-center justify-between gap-4 border-b border-border-subtle py-[13px]">
+        <span className="text-[14px] text-text-muted">Full name</span>
+        <span className="font-mono text-[14px] text-text-strong">{fullName}</span>
+      </div>
+      <div className="flex items-center justify-between gap-4 border-b border-border-subtle py-[13px]">
+        <span className="text-[14px] text-text-muted">Role</span>
+        <span className="font-mono text-[14px] text-text-strong">{role}</span>
+      </div>
       <div className="flex items-center justify-between gap-4 py-[13px]">
-        <span className="text-[14px] text-text-muted">Access source</span>
-        <span className="font-mono text-[14px] text-text-strong">—</span>
+        <span className="text-[14px] text-text-muted">Registered</span>
+        <span className="font-mono text-[14px] text-text-strong">
+          {registeredAt ? fmtDate(registeredAt) : '—'}
+        </span>
       </div>
     </div>
   );
@@ -430,8 +454,6 @@ function AccountInfoCard({ email }: { email: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Pay by days (mini)
 // ─────────────────────────────────────────────────────────────────────────────
-
-const CHIPS = [10_000, 50_000, 100_000, 300_000];
 
 /**
  * Compact pay-as-you-go editor — the mini sibling of PayByDaysPage. The day count is derived
@@ -484,28 +506,7 @@ function PayByDaysCard({ plansData }: { plansData: Parameters<typeof buildPlanVi
         your current access.
       </p>
 
-      <div className="mt-[18px] flex gap-[6px]">
-        {CHIPS.map((n) => {
-          const selected = n === amount;
-          return (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setClamped(n)}
-              className={`flex-1 rounded-[8px] border py-[9px] font-mono text-[13px] leading-none outline-none
-                          transition-colors hover:border-[color-mix(in_oklab,var(--color-warning)_45%,transparent)] ${
-                            selected
-                              ? 'border-[color-mix(in_oklab,var(--color-warning)_55%,transparent)] bg-[color-mix(in_oklab,var(--color-warning)_12%,transparent)] text-warning'
-                              : 'border-border-input bg-transparent text-text-muted'
-                          }`}
-            >
-              {n / 1000}k
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-[10px] flex items-stretch gap-2">
+      <div className="mt-8 flex items-stretch gap-2">
         <button
           type="button"
           onClick={() => setClamped((Math.ceil(amount / pricePerDay) - 1) * pricePerDay)}
