@@ -24,7 +24,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions<T> {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   /** JSON-serialized when present. Its presence also drives the `Content-Type` header. */
   body?: unknown;
   /** Attached as `Authorization: Bearer <token>` when truthy. */

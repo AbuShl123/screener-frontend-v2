@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { fmtSymbol, marketBadge } from '@/features/orderbook/format';
-import { bookKey, type Market } from '@/features/orderbook/types';
+import { type Market } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '../notificationSettingsStore';
 import { useTickers } from '../queries';
+import { buildTickerPool } from '../tickerPool';
 
 /**
  * The Muted-tickers block (design template Settings → Notifications): search → results →
@@ -13,14 +14,6 @@ import { useTickers } from '../queries';
  * `useTickers`, fetched only while the modal is open). Muting is opt-in, so a failed
  * fetch degrades gracefully — existing mutes still render and can be removed.
  */
-
-/** One selectable book in the mute picker. */
-interface PoolEntry {
-  key: string; // bookKey(symbol, market)
-  symbol: string; // raw exchange symbol
-  market: Market;
-}
-
 export function MutedTickers({ open }: { open: boolean }) {
   const muted = useNotificationSettingsStore((s) => s.muted);
   const mute = useNotificationSettingsStore((s) => s.mute);
@@ -30,15 +23,7 @@ export function MutedTickers({ open }: { open: boolean }) {
   const [query, setQuery] = useState('');
 
   // Ticker pool: a FUTURES row for every ticker (always tracked) + a SPOT row iff hasSpot.
-  const pool = useMemo<PoolEntry[]>(() => {
-    const list = tickersQuery.data?.tickers ?? [];
-    const entries: PoolEntry[] = [];
-    for (const t of list) {
-      entries.push({ key: bookKey(t.symbol, 'FUTURES'), symbol: t.symbol, market: 'FUTURES' });
-      if (t.hasSpot) entries.push({ key: bookKey(t.symbol, 'SPOT'), symbol: t.symbol, market: 'SPOT' });
-    }
-    return entries;
-  }, [tickersQuery.data]);
+  const pool = useMemo(() => buildTickerPool(tickersQuery.data?.tickers), [tickersQuery.data]);
 
   const trimmed = query.trim().toUpperCase();
   const mutedSet = useMemo(() => new Set(muted), [muted]);

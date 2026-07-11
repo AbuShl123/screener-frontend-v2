@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { NotificationsSettings } from './NotificationsSettings';
+import { ClassificationRules } from './ClassificationRules';
 
 /**
  * Full-screen Settings overlay (design template "Dashboard Page — Final"). A left nav
- * rail switches sections; only **Notifications** is built here — **Classification rules**
- * and **Appearance** are shown but inert (dimmed, `SOON` chip) per the module plan §5.6.
+ * rail switches sections; **Notifications** and **Classification rules** are built —
+ * **Appearance** is shown but inert (dimmed, `SOON` chip) per the module plans.
  *
  * The dialog is ALWAYS mounted and toggled via opacity/visibility/pointer-events + a
  * subtle scale (matching the template), which preserves the entrance/exit transition and
@@ -21,12 +22,12 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: 'notifications', label: 'Notifications', disabled: false },
-  { id: 'rules', label: 'Classification rules', disabled: true },
+  { id: 'rules', label: 'Classification rules', disabled: false },
   { id: 'appearance', label: 'Appearance', disabled: true },
 ];
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('notifications');
+  const [tab, setTab] = useState<Tab>('rules');
 
   // Close on Escape while open (backdrop click + header × cover the pointer cases).
   useEffect(() => {
@@ -37,6 +38,16 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  // Lock body scroll while open so the dashboard behind the modal can't scroll.
+  useEffect(() => {
+    if (!open) return;
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, [open]);
 
   return (
     <div
@@ -117,6 +128,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           {/* Content */}
           <div className="min-h-0 flex-1 overflow-y-auto px-[26px] pt-6 pb-[30px] scrollbar-slim">
             {tab === 'notifications' && <NotificationsSettings open={open} />}
+            {tab === 'rules' && <ClassificationRules open={open} />}
           </div>
         </div>
       </div>
