@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import { DashboardHeader } from '@/features/orderbook/components/DashboardHeader';
 import { OrderbookCard } from '@/features/orderbook/components/OrderbookCard';
 import { NotificationHandle } from '@/features/orderbook/components/NotificationHandle';
 import { NotificationPanel, PANEL_WIDTH } from '@/features/orderbook/components/NotificationPanel';
 import { useOrderbookFeed } from '@/features/orderbook/useOrderbookFeed';
+import { sortKeys, type SortMode } from '@/features/orderbook/sortOrderbooks';
 import { SettingsModal } from '@/features/settings';
 
 /** Display unit for card notionals. Template default is `$ USD`. */
@@ -26,12 +27,23 @@ export function DashboardPage() {
   useOrderbookFeed();
 
   const [sizeMode, setSizeMode] = useState<SizeMode>('usd');
+  const [sortMode, setSortMode] = useState<SortMode>('importance');
   // Owned here because TWO things depend on it: the handle's visibility and `<main>`'s
   // right padding. Default open to match the template exactly.
   const [notifOpen, setNotifOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const keys = useOrderbookStore((s) => s.keys);
   const status = useOrderbookStore((s) => s.status);
+  // `books` only matters for 'importance' sort (tier counts change every tick); a selector
+  // that returns the same `undefined` reference otherwise means the other three sort modes
+  // never subscribe to the per-message firehose, matching CLAUDE.md's real-time architecture.
+  const importanceBooks = useOrderbookStore(
+    useCallback((s) => (sortMode === 'importance' ? s.books : undefined), [sortMode]),
+  );
+  const sortedKeys = useMemo(
+    () => sortKeys(keys, importanceBooks, sortMode),
+    [keys, importanceBooks, sortMode],
+  );
 
   return (
     <div className="min-h-screen bg-bg text-text">
@@ -39,6 +51,8 @@ export function DashboardPage() {
         tickerCount={keys.length}
         sizeMode={sizeMode}
         onSizeModeChange={setSizeMode}
+        sortMode={sortMode}
+        onSortModeChange={setSortMode}
         onOpenSettings={() => setSettingsOpen(true)}
         settingsOpen={settingsOpen}
       />
@@ -60,7 +74,7 @@ export function DashboardPage() {
           <EmptyState status={status} />
         ) : (
           <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fill,minmax(265px,1fr))]">
-            {keys.map((k) => (
+            {sortedKeys.map((k) => (
               <OrderbookCard key={k} bookKey={k} sizeMode={sizeMode} />
             ))}
           </div>

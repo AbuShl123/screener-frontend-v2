@@ -95,7 +95,14 @@ function scheduleRefresh(): void {
   }, delay);
 }
 
-/** Cancel the timer, drop the single-flight promise, clear tokens, reset to anonymous. */
+/**
+ * Cancel the timer, drop the single-flight promise, clear tokens, reset to anonymous,
+ * and wipe the React Query cache. The cache wipe matters beyond `/me`: every REST query
+ * (classification rules, billing history, …) is keyed without a user id, so without this
+ * a second user logging in on the same tab would see the first user's cached data until
+ * a full page reload. This is the single choke point both `logout()` and a failed
+ * proactive/401 refresh go through, so it covers forced session death too.
+ */
 function hardLogout(): void {
   if (refreshTimer) {
     clearTimeout(refreshTimer);
@@ -109,6 +116,7 @@ function hardLogout(): void {
     refreshToken: null,
     expiresAt: null,
   });
+  queryClient.clear();
 }
 
 /**
@@ -189,8 +197,8 @@ export function fetchMe(): Promise<UserProfile> {
 
 /**
  * Best-effort logout: swallow any network error and ALWAYS clear the session
- * (idempotent discard, per doc §3.6), then evict the profile from the React Query
- * cache. The single place that clears both stores.
+ * (idempotent discard, per doc §3.6) — `clearSession()` → `hardLogout()` also wipes
+ * the React Query cache, so this is the single place that clears both stores.
  */
 export async function logout(): Promise<void> {
   try {
@@ -199,6 +207,5 @@ export async function logout(): Promise<void> {
     // Ignored — logout is best-effort and idempotent.
   } finally {
     useSession.getState().clearSession();
-    queryClient.removeQueries({ queryKey: authKeys.me });
   }
 }

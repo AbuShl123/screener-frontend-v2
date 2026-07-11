@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout, useMe } from '@/features/auth';
+import { SortMenu } from '@/features/orderbook/components/SortMenu';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
+import type { SortMode } from '@/features/orderbook/sortOrderbooks';
 
 interface DashboardHeaderProps {
   /** Live ticker count from the store's `keys.length` (display only). */
@@ -9,6 +11,9 @@ interface DashboardHeaderProps {
   /** Current display unit for card notionals — owned by `DashboardPage`. */
   sizeMode: SizeMode;
   onSizeModeChange: (mode: SizeMode) => void;
+  /** Current card sort order — owned by `DashboardPage`. */
+  sortMode: SortMode;
+  onSortModeChange: (mode: SortMode) => void;
   /** Open the Settings overlay (owned by `DashboardPage`). */
   onOpenSettings: () => void;
   /** Whether the Settings overlay is open — drives the gear's active styling. */
@@ -25,6 +30,8 @@ export function DashboardHeader({
   tickerCount,
   sizeMode,
   onSizeModeChange,
+  sortMode,
+  onSortModeChange,
   onOpenSettings,
   settingsOpen,
 }: DashboardHeaderProps) {
@@ -66,6 +73,11 @@ export function DashboardHeader({
           {tickerCount} TICKERS
         </span>
       </div>
+
+      <span className="h-[22px] w-px bg-border" />
+
+      {/* Sort control (functional) */}
+      <SortMenu sortMode={sortMode} onSortModeChange={onSortModeChange} />
 
       <div className="flex-1" />
 
