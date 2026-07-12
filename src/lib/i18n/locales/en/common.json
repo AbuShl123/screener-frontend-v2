@@ -1,1 +1,8 @@
-{}
+{
+  "nav": {
+    "home": "Screener home"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again."
+  }
+}

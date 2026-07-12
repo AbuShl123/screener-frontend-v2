@@ -104,5 +104,6 @@ export {
   type Namespace,
 } from './config';
 export { formatDate } from './format';
+export { useValidationError } from './useValidationError';
 
 export default i18n;

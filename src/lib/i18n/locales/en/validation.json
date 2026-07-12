@@ -1,1 +1,17 @@
-{}
+{
+  "firstName": {
+    "required": "First name is required"
+  },
+  "lastName": {
+    "required": "Last name is required"
+  },
+  "email": {
+    "invalid": "Enter a valid email"
+  },
+  "password": {
+    "tooShort": "Password must be at least 8 characters long",
+    "confirmRequired": "Please confirm your password",
+    "mismatch": "Passwords do not match",
+    "required": "Password is required"
+  }
+}

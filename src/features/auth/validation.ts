@@ -7,18 +7,22 @@ import { z } from 'zod';
  *
  * This is separate from `schemas.ts` (API response validation): one validates user
  * input, the other validates server output — the two Zod concerns stay untangled.
+ *
+ * i18n (§6.3): a schema is a module-level constant evaluated once at import, before a
+ * language is picked, so each message is a stable `validation:` KEY — never English.
+ * The component resolves it with `useValidationError()` where the field error renders.
  */
 export const registerFormSchema = z
   .object({
-    firstName: z.string().trim().min(1, 'First name is required'),
-    lastName: z.string().trim().min(1, 'Last name is required'),
+    firstName: z.string().trim().min(1, 'validation:firstName.required'),
+    lastName: z.string().trim().min(1, 'validation:lastName.required'),
     // Zod v4 top-level format (the chained `.email()` is deprecated in v4).
-    email: z.email('Enter a valid email'),
-    password: z.string().min(8, 'Password must be at least 8 characters long'),
-    repeatPassword: z.string().min(1, 'Please confirm your password'),
+    email: z.email('validation:email.invalid'),
+    password: z.string().min(8, 'validation:password.tooShort'),
+    repeatPassword: z.string().min(1, 'validation:password.confirmRequired'),
   })
   .refine((data) => data.password === data.repeatPassword, {
-    message: 'Passwords do not match',
+    message: 'validation:password.mismatch',
     path: ['repeatPassword'],
   });
 
@@ -31,7 +35,7 @@ export type RegisterFormValues = z.infer<typeof registerFormSchema>;
  * obviously-junk value is caught inline before the (always-202) resend fires.
  */
 export const resendFormSchema = z.object({
-  email: z.email('Enter a valid email'),
+  email: z.email('validation:email.invalid'),
 });
 
 export type ResendFormValues = z.infer<typeof resendFormSchema>;
@@ -44,8 +48,8 @@ export type ResendFormValues = z.infer<typeof resendFormSchema>;
  * real credential problem surfaces as the server's 401, not a client-side rule.
  */
 export const loginFormSchema = z.object({
-  email: z.email('Enter a valid email'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.email('validation:email.invalid'),
+  password: z.string().min(1, 'validation:password.required'),
 });
 
 export type LoginFormValues = z.infer<typeof loginFormSchema>;

@@ -1,1 +1,17 @@
-{}
+{
+  "firstName": {
+    "required": "Укажите имя"
+  },
+  "lastName": {
+    "required": "Укажите фамилию"
+  },
+  "email": {
+    "invalid": "Введите корректный email"
+  },
+  "password": {
+    "tooShort": "Пароль должен быть не короче 8 символов",
+    "confirmRequired": "Подтвердите пароль",
+    "mismatch": "Пароли не совпадают",
+    "required": "Введите пароль"
+  }
+}

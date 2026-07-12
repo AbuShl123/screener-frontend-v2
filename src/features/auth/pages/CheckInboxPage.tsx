@@ -1,4 +1,5 @@
 import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/Button';
 import { CenteredAuthLayout } from '@/components/layouts/CenteredAuthLayout';
 import { AuthBadge } from '../components/AuthBadge';
@@ -15,6 +16,7 @@ import { useCooldown } from '../hooks/useCooldown';
  * outcome — the backend gives no signal to distinguish sent / not-sent / on-cooldown.
  */
 export function CheckInboxPage() {
+  const { t } = useTranslation('auth');
   const location = useLocation();
   const email = (location.state as { email?: string } | null)?.email;
 
@@ -30,10 +32,10 @@ export function CheckInboxPage() {
   }
 
   const caption = cooldown.active
-    ? `resend available in ${cooldown.remaining} s`
+    ? t('checkInbox.captionCooldown', { seconds: cooldown.remaining })
     : resendMut.isSuccess
-      ? 'Sent — check your inbox again'
-      : 'resend available once per 60 s';
+      ? t('checkInbox.captionSent')
+      : t('checkInbox.captionDefault');
 
   return (
     <CenteredAuthLayout>
@@ -42,14 +44,15 @@ export function CheckInboxPage() {
 
         <div className="flex flex-col gap-[10px]">
           <h1 className="text-[28px] font-semibold tracking-[-0.01em] text-text">
-            Check your inbox
+            {t('checkInbox.title')}
           </h1>
           <p className="text-[14px] leading-[1.6] text-text-secondary">
-            We sent a verification link to
-            <br />
-            <strong className="font-medium text-text-strong">{email}</strong>
-            <br />
-            The link is valid for 24 hours.
+            <Trans
+              t={t}
+              i18nKey="checkInbox.sentTo"
+              values={{ email }}
+              components={{ br: <br />, strong: <strong className="font-medium text-text-strong" /> }}
+            />
           </p>
         </div>
 
@@ -61,13 +64,13 @@ export function CheckInboxPage() {
             disabled={cooldown.active || resendMut.isPending}
             onClick={onResend}
           >
-            Didn&apos;t get it? Resend
+            {t('checkInbox.resend')}
           </Button>
           <span className="font-mono text-[11px] text-text-dim">{caption}</span>
         </div>
 
         <Link to="/login" className="text-[14px] text-text-secondary no-underline">
-          Back to sign in
+          {t('checkInbox.backToSignIn')}
         </Link>
       </div>
     </CenteredAuthLayout>
