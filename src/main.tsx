@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { config } from '@/config/env';
+// Init the i18n singleton for its side effect before <App/> renders — like the other
+// module-level singletons. Bundled synchronously, so no Suspense/loading gate is needed.
+import '@/lib/i18n';
 import App from '@/App';
 import '@/index.css';
 
