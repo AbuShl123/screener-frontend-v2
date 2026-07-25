@@ -71,7 +71,7 @@ export function PaymentStatusPage() {
             { k: 'Reference', v: reference, cls: rowMuted },
           ],
           primary: { label: 'Open terminal →', onClick: () => navigate('/dashboard') },
-          secondary: { label: 'View billing history', onClick: () => navigate('/dashboard') },
+          secondary: { label: 'View billing history', onClick: () => navigate('/account/billing-history') },
           footNote: `A receipt has been emailed to ${email}. No auto-renewal — access simply ends when your subscription runs out.`,
           showProgress: false,
         };

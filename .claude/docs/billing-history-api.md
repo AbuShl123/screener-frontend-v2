@@ -77,6 +77,7 @@ full audit trail — includes abandoned, expired, and failed orders, not just pa
     "reasonDetail": null,
     "checkoutUrl": "https://checkout.multicard.uz/pay/abc123",
     "providerUuid": "9f8e7d6c-...",
+    "receiptUrl": "https://mesh.multicard.uz/receipt/9f8e7d6c",
     "expiresAt": "2026-07-20T10:00:00Z",
     "paidAt": "2026-06-11T09:15:32Z",
     "createdAt": "2026-06-11T09:10:00Z"
@@ -93,6 +94,7 @@ full audit trail — includes abandoned, expired, and failed orders, not just pa
     "reasonDetail": null,
     "checkoutUrl": "https://checkout.multicard.uz/pay/xyz789",
     "providerUuid": "1a2b3c4d-...",
+    "receiptUrl": null,
     "expiresAt": null,
     "paidAt": null,
     "createdAt": "2026-06-05T14:22:10Z"
@@ -118,6 +120,7 @@ create, `/current`, `/{id}`, this list, and embedded in entitlement ledger rows)
 | `reasonDetail` | string \| null | Free-form text accompanying `reason` (e.g. a raw provider error message); usually `null` |
 | `checkoutUrl` | string \| null | Hosted payment page link. Non-null while the order is `PENDING`/re-payable; a terminal order may still carry the last-known URL (now stale/unusable) |
 | `providerUuid` | string \| null | Multicard's transaction uuid — useful for support/debugging, not needed for normal UI flows |
+| `receiptUrl` | string \| null | Provider's bank-receipt page link. Present only on a `PAID` order — and even then may be `null` (Multicard marks it optional). Render as a "View receipt" link when non-null; it opens Multicard's hosted receipt page (not a file download — the user can print/save from there) |
 | `expiresAt` | ISO-8601 string \| null | When the invoice/checkout expires. `null` once the order leaves `PENDING` in most terminal states |
 | `paidAt` | ISO-8601 string \| null | When the order was marked `PAID`; `null` if never paid |
 | `createdAt` | ISO-8601 string | When the order was created |
@@ -246,6 +249,7 @@ per trial seed, paid purchase, or admin grant).
       "reasonDetail": null,
       "checkoutUrl": "https://checkout.multicard.uz/pay/abc123",
       "providerUuid": "9f8e7d6c-...",
+      "receiptUrl": "https://mesh.multicard.uz/receipt/9f8e7d6c",
       "expiresAt": "2026-07-20T10:00:00Z",
       "paidAt": "2026-06-11T09:15:32Z",
       "createdAt": "2026-06-11T09:10:00Z"
@@ -342,6 +346,11 @@ existing, owned order has at least one history row).
   the user's locale client-side.
 - **`checkoutUrl` on a non-`PENDING` order may be stale**: only treat it as clickable/usable when
   `status === "PENDING"`. For a `PAID` order it's historical trivia, not an action.
+- **`receiptUrl` is the "View receipt" action on a `PAID` order**: show the link only when
+  `status === "PAID" && receiptUrl != null`. It opens Multicard's hosted receipt page in a new tab —
+  it is *not* a direct file download, so label it "View receipt" (the user prints/saves from that
+  page). Older orders paid before this field existed, and paid orders where Multicard omitted the
+  URL, will have `receiptUrl: null` — just hide the link in that case.
 - **Correlating order history with entitlement history**: match `order.orderId` on a `PURCHASE`
   ledger row against the `orderId` in the orders list if you need to cross-reference — but usually
   the embedded `order` object is all you need, so a second fetch isn't necessary.

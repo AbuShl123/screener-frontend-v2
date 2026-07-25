@@ -71,6 +71,7 @@ export const orderDetailsSchema = z.object({
   reasonDetail: z.string().nullable(),
   checkoutUrl: z.string().nullable(),
   providerUuid: z.string().nullable(),
+  receiptUrl: z.string().nullable(),
   expiresAt: z.string().nullable(),
   paidAt: z.string().nullable(),
   createdAt: z.string(),

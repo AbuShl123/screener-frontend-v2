@@ -321,12 +321,12 @@ function OrderRow({
                     </button>
                   </>
                 )}
-                {isPaid && (
-                  <button
-                    type="button"
-                    disabled
-                    title="Coming soon"
-                    className="inline-flex flex-none cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-[8px] border border-border-input bg-transparent px-4 py-[11px] font-sans text-[14px] leading-none text-text-muted opacity-50 outline-none"
+                {isPaid && order.receiptUrl && (
+                  <a
+                    href={order.receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex flex-none items-center gap-2 whitespace-nowrap rounded-[8px] border border-border-input bg-transparent px-4 py-[11px] font-sans text-[14px] leading-none text-text-muted outline-none transition-colors duration-150 hover:bg-text-muted/10"
                   >
                     <svg
                       width="15"
@@ -339,12 +339,12 @@ function OrderRow({
                       strokeLinejoin="round"
                       className="flex-none"
                     >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
                     </svg>
-                    Download receipt
-                  </button>
+                    Open receipt
+                  </a>
                 )}
               </div>
             </div>
