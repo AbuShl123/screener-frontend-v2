@@ -1,26 +1,34 @@
+import type { ParseKeys } from 'i18next';
 import type { Plan, PlansResponse } from './schemas';
 
 /**
  * Plan presentation catalog (plan §7). Bridges the API's bare
  * `code / displayName / type / durationDays / amount` with the hardcoded card copy
- * (badge, description, display name) keyed by `code`, and derives the fully-formatted
- * view models the cards render so `PlanCard` can stay purely presentational.
+ * (badge, description, display name) keyed by `code`, and derives the view models the
+ * cards render so `PlanCard` can stay purely presentational.
  *
  * Placed in `billing` (not `landing`) so a future "choose plan" page reuses it.
+ *
+ * i18n (§6.2, labelKey pattern): this module is kept FREE of the i18next instance and
+ * stays a pure constant/derivation. The copy is stored as stable `billing:` KEYS
+ * (`nameKey`/`badgeKey`/`descKey`) and the unit/per-day lines as `{ key, values }`
+ * descriptors; a component resolves them via `resolvePlanDisplay(t, …)` at render.
  *
  * Renders fallback-first (§2.4): each entry carries built-in fallback price/type/
  * duration so the pricing section is correct and layout-stable immediately — no
  * spinner, no skeleton — and live API values override the fallbacks once resolved.
  */
 
+type BillingKey = ParseKeys<'billing'>;
+
 const CURRENCY_FALLBACK = 'UZS';
 
 export interface PlanCopy {
   order: number; // fixed display order
-  name: string; // card title (may differ from API displayName, per template)
-  badge?: string; // 'FLEXIBLE' | 'SAVE 17%' | undefined
+  nameKey: BillingKey; // card title key (may differ from API displayName, per template)
+  badgeKey?: BillingKey; // 'FLEXIBLE' | 'SAVE 17%' key | undefined
   badgeStyle?: 'accent' | 'muted';
-  desc: string;
+  descKey: BillingKey;
   fallbackAmount: number; // used until/unless the API responds (§2.4)
   fallbackType: Plan['type']; // shape the fallback render (unit + per-day) before the API answers
   fallbackDurationDays: number | null;
@@ -30,36 +38,36 @@ export interface PlanCopy {
 const PLAN_COPY: Record<string, PlanCopy> = {
   pay_as_you_go: {
     order: 0,
-    name: 'Pay by days',
-    badge: 'FLEXIBLE',
+    nameKey: 'plans.pay_as_you_go.name',
+    badgeKey: 'plans.pay_as_you_go.badge',
     badgeStyle: 'accent',
-    desc: 'Pay only for the days you trade. Top up any number of days — access ends when they run out. No auto-renewal.',
+    descKey: 'plans.pay_as_you_go.desc',
     fallbackAmount: 10000,
     fallbackType: 'PER_DAY',
     fallbackDurationDays: null,
   },
   weekly: {
     order: 1,
-    name: 'Weekly',
-    desc: 'Seven days of full access. Good for trying a strategy or trading an event week.',
+    nameKey: 'plans.weekly.name',
+    descKey: 'plans.weekly.desc',
     fallbackAmount: 50000,
     fallbackType: 'FIXED',
     fallbackDurationDays: 7,
   },
   monthly: {
     order: 2,
-    name: 'Monthly',
-    desc: 'The standard plan. One payment, thirty days of everything.',
+    nameKey: 'plans.monthly.name',
+    descKey: 'plans.monthly.desc',
     fallbackAmount: 150000,
     fallbackType: 'FIXED',
     fallbackDurationDays: 30,
   },
   yearly: {
     order: 3,
-    name: 'Yearly',
-    badge: 'SAVE 17%',
+    nameKey: 'plans.yearly.name',
+    badgeKey: 'plans.yearly.badge',
     badgeStyle: 'muted',
-    desc: 'A full year at the lowest per-day rate. Set it once, forget billing.',
+    descKey: 'plans.yearly.desc',
     fallbackAmount: 1500000,
     fallbackType: 'FIXED',
     fallbackDurationDays: 365,
@@ -67,27 +75,33 @@ const PLAN_COPY: Record<string, PlanCopy> = {
 };
 
 /**
- * Plan code → display name, derived from the copy catalog so the four known plans'
+ * Plan code → display-name KEY, derived from the copy catalog so the four known plans'
  * labels live in one place. Reused by the billing-history page to render a readable
- * plan name instead of the raw `planCode`.
+ * plan name (resolved with `t()`) instead of the raw `planCode`.
  */
-export const PLAN_NAMES: Record<string, string> = Object.fromEntries(
-  Object.entries(PLAN_COPY).map(([code, copy]) => [code, copy.name]),
+export const PLAN_NAME_KEYS: Record<string, BillingKey> = Object.fromEntries(
+  Object.entries(PLAN_COPY).map(([code, copy]) => [code, copy.nameKey] as const),
 );
 
-/** Everything a `PlanCard` needs, all derived here (§7). */
+/** A translation KEY plus its interpolation values, resolved with `t()` at render (§6.2). */
+export interface PlanText {
+  key: BillingKey;
+  values?: Record<string, string | number>;
+}
+
+/** Everything a `PlanCard` needs, all derived here (§7). Text is KEYS, not prose (§6.2). */
 export interface PlanView {
   code: string;
-  name: string;
+  nameKey: BillingKey;
   highlight: boolean;
-  badge?: string;
+  badgeKey?: BillingKey;
   badgeStyle?: 'accent' | 'muted';
   amount: number; // raw amount (unformatted), e.g. for pre-filling an input
   durationDays: number | null; // null for PER_DAY; the fixed span for a FIXED plan
-  price: string; // e.g. "150,000" — grouping only
-  unit: string; // FIXED → `${currency} / ${durationDays} days`; PER_DAY → `${currency} / day`
-  desc: string;
-  perDay: string; // PER_DAY → 'from 1 day, any amount'; FIXED → `≈ N ${currency} / day`
+  price: string; // e.g. "150,000" — grouping only (a fixed number, never localized §10.1)
+  unit: PlanText; // FIXED → `${currency} / ${days} days`; PER_DAY → `${currency} / day`
+  descKey: BillingKey;
+  perDay: PlanText; // PER_DAY → 'from 1 day, any amount'; FIXED → `≈ N ${currency} / day`
 }
 
 const groupFmt = new Intl.NumberFormat('en-US'); // grouping only, no currency symbol
@@ -117,32 +131,34 @@ export function buildPlanViews(data?: PlansResponse): PlanView[] {
       const durationDays = apiPlan ? apiPlan.durationDays : copy.fallbackDurationDays;
       const amount = apiPlan?.amount ?? copy.fallbackAmount;
 
-      let unit: string;
-      let perDay: string;
+      let unit: PlanText;
+      let perDay: PlanText;
       if (type === 'PER_DAY' || durationDays == null) {
-        unit = `${currency} / day`;
-        perDay = 'from 1 day, any amount';
+        unit = { key: 'plans.unit.perDay', values: { currency } };
+        perDay = { key: 'plans.rate.payg' };
       } else {
-        unit = `${currency} / ${durationDays} days`;
+        unit = { key: 'plans.unit.fixed', values: { currency, days: durationDays } };
         const per = amount / durationDays;
         const rounded = Math.round(per);
         // '=' when it divides evenly, '≈' otherwise (matching the template).
         const sign = per === rounded ? '=' : '≈';
-        perDay = `${sign} ${groupFmt.format(rounded)} ${currency} / day`;
+        // `amount` here is the pre-formatted, fixed-format number string (§10.1) passed
+        // straight through as an interpolation value — it is never re-localized.
+        perDay = { key: 'plans.rate.fixed', values: { sign, amount: groupFmt.format(rounded), currency } };
       }
 
       return [
         {
           code,
-          name: copy.name,
+          nameKey: copy.nameKey,
           highlight: code === 'pay_as_you_go',
-          badge: copy.badge,
+          badgeKey: copy.badgeKey,
           badgeStyle: copy.badgeStyle,
           amount,
           durationDays,
           price: groupFmt.format(amount),
           unit,
-          desc: copy.desc,
+          descKey: copy.descKey,
           perDay,
         } satisfies PlanView,
       ];

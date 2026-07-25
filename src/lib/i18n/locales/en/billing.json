@@ -1,1 +1,351 @@
-{}
+{
+  "plans": {
+    "pay_as_you_go": {
+      "name": "Pay by days",
+      "badge": "FLEXIBLE",
+      "desc": "Pay only for the days you trade. Top up any number of days — access ends when they run out. No auto-renewal."
+    },
+    "weekly": {
+      "name": "Weekly",
+      "desc": "Seven days of full access. Good for trying a strategy or trading an event week."
+    },
+    "monthly": {
+      "name": "Monthly",
+      "desc": "The standard plan. One payment, thirty days of everything."
+    },
+    "yearly": {
+      "name": "Yearly",
+      "badge": "SAVE 17%",
+      "desc": "A full year at the lowest per-day rate. Set it once, forget billing."
+    },
+    "unit": {
+      "perDay": "{{currency}} / day",
+      "fixed": "{{currency}} / {{days}} days"
+    },
+    "rate": {
+      "payg": "from 1 day, any amount",
+      "fixed": "{{sign}} {{amount}} {{currency}} / day"
+    },
+    "dayCount_one": "{{count}} day",
+    "dayCount_other": "{{count}} days"
+  },
+  "nav": {
+    "plansBreadcrumb": "Billing · Plans"
+  },
+  "planCard": {
+    "start": "Start now",
+    "choose": "Choose plan"
+  },
+  "header": {
+    "account": "Account",
+    "goDashboard": "Go to dashboard"
+  },
+  "accountNav": {
+    "account": "Account",
+    "billingHistory": "Billing history",
+    "security": "Security",
+    "settings": "Settings",
+    "goDashboard": "Go to dashboard",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…"
+  },
+  "choosePlan": {
+    "eyebrow": "Billing · Choose a plan",
+    "title": "Pick how you want to pay.",
+    "subtitle": "Every plan unlocks the full terminal — 500+ tickers, custom rules, charts and alerts. The only difference is duration and price.",
+    "footnote": "all plans · 500+ tickers · custom rules · charts · oi alerts · voice notifications"
+  },
+  "payByDays": {
+    "eyebrow": "Pay by days · Flexible",
+    "title": "How much do you want to top up?",
+    "subtitle": "Enter any amount. We'll convert it to days of full terminal access at the current daily rate — no auto-renewal, access ends when your days run out.",
+    "enterAmount": "Enter amount",
+    "buysYou": "That buys you",
+    "daysUnit_one": "day",
+    "daysUnit_other": "days",
+    "fullAccess": "of full terminal access",
+    "accessUntil": "Access until",
+    "rate": "Rate",
+    "invalidBadge": "Invalid",
+    "invalidMessage": "Invalid amount — try entering a different amount.",
+    "summaryLabel": "Pay by days",
+    "cancel": "Cancel",
+    "continue": "Continue to payment →"
+  },
+  "paymentMethod": {
+    "eyebrow": "Billing · Payment method",
+    "title": "How do you want to pay?",
+    "subtitle": "Pick a method to complete your subscription. More providers are being added — for now Multicard covers Uzbek bank cards.",
+    "supported": "Supported",
+    "multicardDesc": "Uzbek bank cards — UZCARD & HUMO. Charged in UZS. Instant activation.",
+    "comingSoon": "Coming soon",
+    "moreOnTheWay": "{{count}} more on the way",
+    "soon": "Soon",
+    "soonMethods": {
+      "visa": "Visa / Mastercard",
+      "applePay": "Apple Pay",
+      "kaspi": "Kaspi",
+      "paypal": "PayPal",
+      "russianCards": "Russian cards (МИР)",
+      "crypto": "Crypto (USDT)"
+    },
+    "summary": {
+      "title": "Order summary",
+      "change": "Change",
+      "paygPeriod": "Pay by days · {{duration}} of full terminal access",
+      "period": "{{duration}} of full terminal access",
+      "duration": "Duration",
+      "accessUntil": "Access until",
+      "rate": "Rate",
+      "method": "Method",
+      "youPay": "You pay",
+      "note": "You will be redirected to Multicard to complete payment securely. No auto-renewal — access ends when your subscription runs out."
+    },
+    "errorBadge": "Error",
+    "genericError": "Something went wrong. Please try again.",
+    "checkoutFailed": "Could not start checkout. Please try again.",
+    "cancel": "Cancel",
+    "pay": "Pay with Multicard →",
+    "redirecting": "Redirecting…",
+    "unknownPlan": {
+      "eyebrow": "Billing · Payment method",
+      "title": "No plan selected",
+      "body": "We couldn't find the plan you were paying for. Head back to choose one.",
+      "back": "Back to plans"
+    }
+  },
+  "paymentStatus": {
+    "yourEmail": "your email",
+    "rows": {
+      "plan": "Plan",
+      "paid": "Paid",
+      "amount": "Amount",
+      "accessUntil": "Access until",
+      "reference": "Reference"
+    },
+    "confirming": {
+      "eyebrow": "Billing · Multicard",
+      "title": "Confirming your payment…",
+      "subtitle": "Your bank and Multicard are settling the transaction. This can take up to a minute — keep this tab open.",
+      "wellLabel": "Pending order",
+      "pill": "Awaiting confirmation",
+      "footNote": "Do not refresh or navigate away. If confirmation takes longer than 90 seconds we'll stop and let you retry."
+    },
+    "success": {
+      "eyebrow": "Payment confirmed",
+      "titleUntil": "You're all in until {{date}}",
+      "title": "You're all in",
+      "subtitle": "Full terminal access is live on your account — real-time books, custom rules and alerts across every supported ticker.",
+      "wellLabel": "Receipt",
+      "pill": "Paid",
+      "planValue": "{{plan}} · {{duration}}",
+      "primary": "Open terminal →",
+      "secondary": "View billing history",
+      "footNote": "A receipt has been emailed to {{email}}. No auto-renewal — access simply ends when your subscription runs out."
+    },
+    "timeout": {
+      "eyebrow": "Payment not completed",
+      "title": "Payment not completed",
+      "subtitle": "We didn't receive a confirmation from Multicard in time. Your plan hasn't been activated and you have not been charged.",
+      "banner": "We couldn't confirm this payment within 90 seconds. If your card was charged it will be reversed automatically — nothing was activated.",
+      "wellLabel": "Attempted order",
+      "pill": "Not confirmed",
+      "primary": "Retry payment",
+      "secondary": "Choose another plan",
+      "footNote": "Charged anyway? Any unconfirmed authorisation is released by your bank automatically, usually within a few business days."
+    },
+    "declined": {
+      "eyebrow": "Payment failed",
+      "title": "Payment failed",
+      "subtitle": "Something went wrong. Please try again — no money was charged.",
+      "bannerFallback": "The payment provider reported an error.",
+      "wellLabel": "Attempted order",
+      "pill": "Failed",
+      "primary": "Retry payment",
+      "secondary": "Back to dashboard",
+      "footNote": "No charge was made. You can try another card or plan whenever you're ready."
+    },
+    "refunded": {
+      "eyebrow": "Payment refunded",
+      "title": "Money refunded",
+      "subtitle": "This payment was refunded and the charge reversed. Your existing access stays active until it expires.",
+      "bannerFallback": "This payment was reversed by the provider.",
+      "wellLabel": "Refunded order",
+      "pill": "Refunded",
+      "primary": "Open terminal →",
+      "secondary": "Choose another plan",
+      "footNote": "The refund should appear on your statement within a few business days."
+    },
+    "notfound": {
+      "eyebrow": "Order not found",
+      "title": "Order not found",
+      "subtitle": "We couldn't find an active order, or your invoice has been canceled. Did you cancel your payment?",
+      "banner": "If you canceled your order, ignore this message. Otherwise try refreshing this page or start the payment again.",
+      "wellLabel": "Order",
+      "pill": "Not found",
+      "primary": "Start payment",
+      "secondary": "Back to dashboard",
+      "footNote": "Already paid? Give it a minute and refresh — confirmations can lag behind the redirect."
+    }
+  },
+  "account": {
+    "unpaidInvoice": {
+      "label": "Unpaid invoice",
+      "issued": "issued {{date}} · {{ref}}",
+      "body": "The payment didn't go through. Retry it, switch to a different plan, or cancel the invoice.",
+      "retry": "Retry payment",
+      "choosePlan": "Choose another plan",
+      "cancel": "Cancel payment",
+      "cancelling": "Cancelling…"
+    },
+    "access": {
+      "label": "Screener access",
+      "daysLeft_one": "{{count}} day left",
+      "daysLeft_other": "{{count}} days left",
+      "admin": {
+        "pill": "Admin · Unlimited",
+        "status": "Unlimited access",
+        "days": "No expiry",
+        "sub": "You have admin access — unlimited, with no expiry date.",
+        "footnote": "admin account"
+      },
+      "trial": {
+        "pill": "Trial",
+        "statusUntil": "Trial until {{date}}",
+        "status": "Free trial",
+        "sub": "You're on the free trial. Subscribe to keep access when it ends — no card was taken.",
+        "primary": "Subscribe",
+        "footnote": "full product during trial"
+      },
+      "active": {
+        "pill": "Active · Paid",
+        "statusUntil": "Access until {{date}}",
+        "status": "Active",
+        "subRenewing": "Renewal window is open. Pay once to extend — access ends on the date above otherwise.",
+        "subCovered": "You're covered. Payments are one-time — nothing renews automatically.",
+        "primary": "Renew access",
+        "footnoteRenewing": "one-time payment · no auto-charge",
+        "footnoteCovered": "renewal opens when 5 days remain"
+      },
+      "expired": {
+        "pill": "No access",
+        "statusEnded": "Access ended {{date}}",
+        "status": "No active access",
+        "sub": "You have no active access. Choose a plan — or top up a few days to get straight back in.",
+        "primary": "Choose a plan",
+        "footnote": "your rules and settings are kept"
+      }
+    },
+    "info": {
+      "title": "Account",
+      "email": "Email",
+      "fullName": "Full name",
+      "role": "Role",
+      "registered": "Registered"
+    },
+    "payByDays": {
+      "label": "Pay by days",
+      "flexible": "Flexible",
+      "perDayUnit": "{{currency}} / day",
+      "body": "Pay any amount, any time — no renewal window. We convert it to days and add them on top of your current access.",
+      "ratio": "{{amount}} ÷ {{price}} /day",
+      "resultDays_one": "= {{count}} day",
+      "resultDays_other": "= {{count}} days",
+      "topUp_one": "Top up {{count}} day",
+      "topUp_other": "Top up {{count}} days",
+      "enterAmount": "Enter an amount",
+      "footnote": "from 1 day, any amount · one-time payment"
+    }
+  },
+  "history": {
+    "title": "Billing history",
+    "ordersCount_one": "{{count}} order",
+    "ordersCount_other": "{{count}} orders",
+    "grantsCount_one": "{{count}} grant",
+    "grantsCount_other": "{{count}} grants",
+    "caption": "{{orders}} · {{grants}} · access through {{access}}",
+    "tabs": {
+      "payments": "Payments",
+      "grants": "Access grants"
+    },
+    "cols": {
+      "status": "Status",
+      "plan": "Plan",
+      "amount": "Amount",
+      "date": "Date",
+      "source": "Source",
+      "grant": "Grant",
+      "added": "Added",
+      "accessThrough": "Access through"
+    },
+    "grantsNote": "Only successful grants appear here — trials, paid purchases and admin credits. Failed or expired orders never grant access, so they live under Payments.",
+    "empty": {
+      "title": "No payments yet",
+      "body": "You haven't made any payment attempts. When you subscribe or top up, every order shows up here — paid, pending or failed.",
+      "cta": "Choose a plan"
+    },
+    "order": {
+      "orderId": "Order ID",
+      "provider": "Provider",
+      "providerRef": "Provider ref",
+      "accessBought": "Access bought",
+      "complete": "Complete payment",
+      "cancel": "Cancel order",
+      "cancelling": "Cancelling…",
+      "openReceipt": "Open receipt",
+      "statusHistory": "Status history",
+      "loading": "Loading…",
+      "loadError": "Couldn't load status history.",
+      "copied": "Copied"
+    },
+    "grant": {
+      "purchaseTitle": "{{plan}} purchase",
+      "trialTitle": "Free trial started",
+      "trialSubDefault": "Seeded on registration",
+      "adminTitle": "Admin credit granted",
+      "viewOrder": "View order →",
+      "added_one": "+{{count}} day",
+      "added_other": "+{{count}} days",
+      "was": "was {{date}}"
+    },
+    "reasonWithDetail": "{{reason}} — {{detail}}",
+    "status": {
+      "created": "Created",
+      "pending": "Pending",
+      "paid": "Paid",
+      "expired": "Expired",
+      "failed": "Failed",
+      "canceled": "Canceled",
+      "reverted": "Refunded"
+    },
+    "source": {
+      "purchase": "Purchase",
+      "trial": "Trial",
+      "admin": "Admin gift"
+    },
+    "reason": {
+      "SUPERSEDED": "Superseded by a newer order",
+      "USER_CANCELED": "Canceled before payment",
+      "INVOICE_EXPIRED": "Invoice expired — no payment received",
+      "AMOUNT_MISMATCH": "Payment amount did not match",
+      "UNKNOWN_ORDER": "Unknown order referenced",
+      "PROVIDER_ERROR": "Payment failed at provider",
+      "PROVIDER_REVERT": "Refund detected — access kept",
+      "CALLBACK_GRANT": "Paid & access granted",
+      "RECONCILED_GRANT": "Paid & granted (reconciled)"
+    },
+    "timeline": {
+      "awaitingPayment": "Awaiting payment",
+      "orderCreated": "Order created"
+    }
+  },
+  "checkoutStub": {
+    "eyebrow": "Checkout",
+    "title": "Payment coming soon",
+    "selectedPlan": "Selected plan",
+    "noPlan": "No plan selected. Head back to pricing to choose one.",
+    "placeholder": "The payment flow isn't wired up yet — this is a placeholder for it.",
+    "backToPricing": "Back to pricing",
+    "goDashboard": "Go to dashboard"
+  }
+}

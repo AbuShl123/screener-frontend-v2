@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { BrandMark } from '@/components/BrandMark';
 import { Button } from '@/components/Button';
@@ -13,6 +14,7 @@ import { useMe } from '@/features/auth';
  * hasn't resolved (or failed), those slots are simply blank.
  */
 export function BillingHeader() {
+  const { t } = useTranslation('billing');
   const me = useMe();
   const navigate = useNavigate();
 
@@ -29,7 +31,7 @@ export function BillingHeader() {
         )}
         <button
           type="button"
-          title="Account"
+          title={t('header.account')}
           onClick={() => navigate('/account')}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border
                      border-accent/40 bg-accent/[0.18] font-mono text-[12px] font-medium
@@ -44,7 +46,7 @@ export function BillingHeader() {
             onClick={() => navigate('/dashboard')}
             className="inline-flex items-center gap-2 !py-3"
           >
-            Go to dashboard
+            {t('header.goDashboard')}
             <svg
               width="17"
               height="17"

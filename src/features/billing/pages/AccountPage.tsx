@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import type { ParseKeys } from 'i18next';
 import { Button } from '@/components/Button';
 import { useMe, type UserProfile } from '@/features/auth';
 import { buildPlanViews } from '../catalog';
@@ -7,6 +9,8 @@ import { AccountLayout } from '../components/AccountLayout';
 import { fmtDate } from '../historyView';
 import { useCancelOrder, useLatestOrder, usePlans } from '../queries';
 import type { OrderDetails } from '../schemas';
+
+type BillingKey = ParseKeys<'billing'>;
 
 const CURRENCY = 'UZS';
 const DAY_MS = 86_400_000;
@@ -28,13 +32,15 @@ const clampPct = (frac: number) => Math.round(Math.min(1, Math.max(0, frac)) * 1
 
 interface AccessView {
   heroVar: string;
-  pillLabel: string;
-  statusLine: string;
-  daysNote: string;
+  pillKey: BillingKey;
+  statusKey: BillingKey;
+  date?: string; // pre-formatted (localized) date, interpolated into `statusKey` when present
+  daysNoteKey: BillingKey;
+  daysLeft?: number; // count for the pluralized days-left note (undefined for admin's static note)
   meterPct: number;
-  subLine: string;
-  primaryLabel: string | null; // null → no CTA (covered / admin)
-  footnote: string;
+  subKey: BillingKey;
+  primaryKey: BillingKey | null; // null → no CTA (covered / admin)
+  footnoteKey: BillingKey;
 }
 
 /**
@@ -46,20 +52,25 @@ interface AccessView {
  *  - EXPIRED → "Choose a plan"
  * Every CTA routes to /billing/plans; the meter is a best-effort proportion (7-day trial
  * window, 30-day reference for paid) since /me carries no original grant duration.
+ *
+ * i18n (§6.2): stays free of `t()` — it emits KEYS + the (localized) date/day-count values;
+ * `AccessCard` resolves them at render. The date goes through `fmtDate` (localized, §6.4);
+ * the day count is a fixed number fed to the plural note.
  */
 function buildAccessView(profile: UserProfile): AccessView {
   const { accessState, accessExpiresAt } = profile;
+  const date = accessExpiresAt ? fmtDate(accessExpiresAt) : undefined;
 
   if (accessState === 'ADMIN') {
     return {
       heroVar: HERO.bid,
-      pillLabel: 'Admin · Unlimited',
-      statusLine: 'Unlimited access',
-      daysNote: 'No expiry',
+      pillKey: 'account.access.admin.pill',
+      statusKey: 'account.access.admin.status',
+      daysNoteKey: 'account.access.admin.days',
       meterPct: 100,
-      subLine: 'You have admin access — unlimited, with no expiry date.',
-      primaryLabel: null,
-      footnote: 'admin account',
+      subKey: 'account.access.admin.sub',
+      primaryKey: null,
+      footnoteKey: 'account.access.admin.footnote',
     };
   }
 
@@ -67,14 +78,15 @@ function buildAccessView(profile: UserProfile): AccessView {
     const left = accessExpiresAt ? daysUntil(accessExpiresAt) : 0;
     return {
       heroVar: HERO.warning,
-      pillLabel: 'Trial',
-      statusLine: accessExpiresAt ? `Trial until ${fmtDate(accessExpiresAt)}` : 'Free trial',
-      daysNote: `${left} days left`,
+      pillKey: 'account.access.trial.pill',
+      statusKey: date ? 'account.access.trial.statusUntil' : 'account.access.trial.status',
+      date,
+      daysNoteKey: 'account.access.daysLeft',
+      daysLeft: left,
       meterPct: clampPct(left / 7),
-      subLine:
-        'You’re on the free trial. Subscribe to keep access when it ends — no card was taken.',
-      primaryLabel: 'Subscribe',
-      footnote: 'full product during trial',
+      subKey: 'account.access.trial.sub',
+      primaryKey: 'account.access.trial.primary',
+      footnoteKey: 'account.access.trial.footnote',
     };
   }
 
@@ -83,29 +95,32 @@ function buildAccessView(profile: UserProfile): AccessView {
     const renewing = left <= RENEWAL_WINDOW_DAYS;
     return {
       heroVar: renewing ? HERO.warning : HERO.bid,
-      pillLabel: 'Active · Paid',
-      statusLine: accessExpiresAt ? `Access until ${fmtDate(accessExpiresAt)}` : 'Active',
-      daysNote: `${left} ${left === 1 ? 'day' : 'days'} left`,
+      pillKey: 'account.access.active.pill',
+      statusKey: date ? 'account.access.active.statusUntil' : 'account.access.active.status',
+      date,
+      daysNoteKey: 'account.access.daysLeft',
+      daysLeft: left,
       meterPct: clampPct(left / 30),
-      subLine: renewing
-        ? 'Renewal window is open. Pay once to extend — access ends on the date above otherwise.'
-        : 'You’re covered. Payments are one-time — nothing renews automatically.',
-      primaryLabel: renewing ? 'Renew access' : null,
-      footnote: renewing ? 'one-time payment · no auto-charge' : 'renewal opens when 5 days remain',
+      subKey: renewing ? 'account.access.active.subRenewing' : 'account.access.active.subCovered',
+      primaryKey: renewing ? 'account.access.active.primary' : null,
+      footnoteKey: renewing
+        ? 'account.access.active.footnoteRenewing'
+        : 'account.access.active.footnoteCovered',
     };
   }
 
   // EXPIRED
   return {
     heroVar: HERO.danger,
-    pillLabel: 'No access',
-    statusLine: accessExpiresAt ? `Access ended ${fmtDate(accessExpiresAt)}` : 'No active access',
-    daysNote: '0 days left',
+    pillKey: 'account.access.expired.pill',
+    statusKey: date ? 'account.access.expired.statusEnded' : 'account.access.expired.status',
+    date,
+    daysNoteKey: 'account.access.daysLeft',
+    daysLeft: 0,
     meterPct: 0,
-    subLine:
-      'You have no active access. Choose a plan — or top up a few days to get straight back in.',
-    primaryLabel: 'Choose a plan',
-    footnote: 'your rules and settings are kept',
+    subKey: 'account.access.expired.sub',
+    primaryKey: 'account.access.expired.primary',
+    footnoteKey: 'account.access.expired.footnote',
   };
 }
 
@@ -121,6 +136,7 @@ function buildAccessView(profile: UserProfile): AccessView {
  *     to the Payment Method page.
  */
 export function AccountPage() {
+  const { t } = useTranslation('billing');
   const navigate = useNavigate();
   const me = useMe();
   const profile = me.data;
@@ -130,6 +146,14 @@ export function AccountPage() {
 
   const accessView = profile ? buildAccessView(profile) : null;
   const pendingOrder = order?.status === 'PENDING' ? order : null;
+  const pendingPlan = pendingOrder
+    ? buildPlanViews(plansData).find((p) => p.code === pendingOrder.planCode)
+    : undefined;
+  const pendingPlanName = pendingOrder
+    ? pendingPlan
+      ? t(pendingPlan.nameKey)
+      : pendingOrder.planCode
+    : '';
 
   return (
     <AccountLayout>
@@ -139,10 +163,7 @@ export function AccountPage() {
           {pendingOrder && (
             <UnpaidInvoiceCard
               order={pendingOrder}
-              planName={
-                buildPlanViews(plansData).find((p) => p.code === pendingOrder.planCode)?.name ??
-                pendingOrder.planCode
-              }
+              planName={pendingPlanName}
               cancelling={cancelOrder.isPending}
               onRetry={() => {
                 if (pendingOrder.checkoutUrl) window.location.assign(pendingOrder.checkoutUrl);
@@ -193,15 +214,16 @@ function UnpaidInvoiceCard({
   onChoosePlan,
   onCancel,
 }: UnpaidInvoiceCardProps) {
+  const { t } = useTranslation('billing');
   const days = Math.round(order.accessDurationSeconds / 86_400);
-  const durationLabel = `${days} ${days === 1 ? 'day' : 'days'}`;
+  const durationLabel = t('plans.dayCount', { count: days });
 
   return (
     <div className="rounded-[10px] border border-[color-mix(in_oklab,var(--color-danger)_38%,transparent)] bg-surface px-[22px] py-5">
       <div className="flex items-center gap-[10px]">
         <span className="h-[7px] w-[7px] flex-none rounded-full bg-danger" />
         <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-danger">
-          Unpaid invoice
+          {t('account.unpaidInvoice.label')}
         </span>
       </div>
 
@@ -213,12 +235,15 @@ function UnpaidInvoiceCard({
           {groupFmt.format(order.amount)} {CURRENCY}
         </span>
         <span className="font-mono text-[12px] text-text-dim">
-          issued {fmtDate(order.createdAt)} · {order.orderId.slice(0, 8)}
+          {t('account.unpaidInvoice.issued', {
+            date: fmtDate(order.createdAt),
+            ref: order.orderId.slice(0, 8),
+          })}
         </span>
       </div>
 
       <p className="mt-[6px] max-w-[480px] text-[13px] leading-[1.6] text-text-secondary">
-        The payment didn’t go through. Retry it, switch to a different plan, or cancel the invoice.
+        {t('account.unpaidInvoice.body')}
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -228,7 +253,7 @@ function UnpaidInvoiceCard({
           className="rounded-[8px] border border-danger bg-danger px-4 py-[10px] text-[14px] font-medium
                      leading-none text-bg transition-[filter] duration-150 hover:brightness-110"
         >
-          Retry payment
+          {t('account.unpaidInvoice.retry')}
         </button>
         <button
           type="button"
@@ -237,7 +262,7 @@ function UnpaidInvoiceCard({
                      bg-transparent px-4 py-[10px] text-[14px] font-medium leading-none text-danger
                      transition-colors duration-150 hover:bg-danger/10"
         >
-          Choose another plan
+          {t('account.unpaidInvoice.choosePlan')}
         </button>
         <button
           type="button"
@@ -247,7 +272,7 @@ function UnpaidInvoiceCard({
                      font-medium leading-none text-text-muted transition-colors duration-150
                      hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {cancelling ? 'Cancelling…' : 'Cancel payment'}
+          {cancelling ? t('account.unpaidInvoice.cancelling') : t('account.unpaidInvoice.cancel')}
         </button>
       </div>
     </div>
@@ -259,11 +284,14 @@ function UnpaidInvoiceCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AccessCard({ view, onPrimary }: { view: AccessView; onPrimary: () => void }) {
+  const { t } = useTranslation('billing');
+  const daysNote =
+    view.daysLeft != null ? t(view.daysNoteKey, { count: view.daysLeft }) : t(view.daysNoteKey);
   return (
     <div className="rounded-[14px] border border-border bg-surface p-7 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-          Screener access
+          {t('account.access.label')}
         </span>
         <span
           className="inline-flex items-center gap-[7px] rounded-full border px-3 py-[5px] font-mono text-[11px]
@@ -275,12 +303,12 @@ function AccessCard({ view, onPrimary }: { view: AccessView; onPrimary: () => vo
           }}
         >
           <span className="h-[6px] w-[6px] rounded-full" style={{ background: view.heroVar }} />
-          {view.pillLabel}
+          {t(view.pillKey)}
         </span>
       </div>
 
       <div className="mt-5 text-[27px] font-semibold tracking-[-0.01em] text-text">
-        {view.statusLine}
+        {t(view.statusKey, view.date ? { date: view.date } : undefined)}
       </div>
 
       <div className="mt-[14px] flex items-center gap-[14px]">
@@ -288,7 +316,7 @@ function AccessCard({ view, onPrimary }: { view: AccessView; onPrimary: () => vo
           className="whitespace-nowrap font-mono text-[12px] uppercase tracking-[0.08em]"
           style={{ color: view.heroVar }}
         >
-          {view.daysNote}
+          {daysNote}
         </span>
         <div className="h-1 flex-1 overflow-hidden rounded-[2px] bg-input">
           <div
@@ -299,16 +327,16 @@ function AccessCard({ view, onPrimary }: { view: AccessView; onPrimary: () => vo
       </div>
 
       <p className="mt-[14px] max-w-[520px] text-[14px] leading-[1.6] text-text-secondary">
-        {view.subLine}
+        {t(view.subKey)}
       </p>
 
       <div className="mt-[22px] flex flex-wrap items-center gap-[14px] border-t border-border-subtle pt-5">
-        {view.primaryLabel && (
+        {view.primaryKey && (
           <Button variant="primary" fullWidth={false} onClick={onPrimary}>
-            {view.primaryLabel}
+            {t(view.primaryKey)}
           </Button>
         )}
-        <span className="font-mono text-[12px] text-text-dim">{view.footnote}</span>
+        <span className="font-mono text-[12px] text-text-dim">{t(view.footnoteKey)}</span>
       </div>
     </div>
   );
@@ -329,27 +357,28 @@ function AccountInfoCard({
   role: string;
   registeredAt: string | undefined;
 }) {
+  const { t } = useTranslation('billing');
   return (
     <div className="rounded-[10px] border border-border bg-input px-6 pb-[6px] pt-[22px]">
       <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-        Account
+        {t('account.info.title')}
       </div>
       <div className="flex items-center justify-between gap-4 border-b border-border-subtle py-[13px]">
-        <span className="text-[14px] text-text-muted">Email</span>
+        <span className="text-[14px] text-text-muted">{t('account.info.email')}</span>
         <span className="min-w-0 text-right font-mono text-[14px] text-text-strong [overflow-wrap:anywhere]">
           {email}
         </span>
       </div>
       <div className="flex items-center justify-between gap-4 border-b border-border-subtle py-[13px]">
-        <span className="text-[14px] text-text-muted">Full name</span>
+        <span className="text-[14px] text-text-muted">{t('account.info.fullName')}</span>
         <span className="font-mono text-[14px] text-text-strong">{fullName}</span>
       </div>
       <div className="flex items-center justify-between gap-4 border-b border-border-subtle py-[13px]">
-        <span className="text-[14px] text-text-muted">Role</span>
+        <span className="text-[14px] text-text-muted">{t('account.info.role')}</span>
         <span className="font-mono text-[14px] text-text-strong">{role}</span>
       </div>
       <div className="flex items-center justify-between gap-4 py-[13px]">
-        <span className="text-[14px] text-text-muted">Registered</span>
+        <span className="text-[14px] text-text-muted">{t('account.info.registered')}</span>
         <span className="font-mono text-[14px] text-text-strong">
           {registeredAt ? fmtDate(registeredAt) : '—'}
         </span>
@@ -370,6 +399,7 @@ function AccountInfoCard({
  * page via the same `?plan=pay_as_you_go&amount=N` contract PayByDaysPage uses.
  */
 function PayByDaysCard({ plansData }: { plansData: Parameters<typeof buildPlanViews>[0] }) {
+  const { t } = useTranslation('billing');
   const navigate = useNavigate();
   const paygPlan = buildPlanViews(plansData).find((p) => p.code === 'pay_as_you_go');
   const pricePerDay = paygPlan?.amount ?? 10_000;
@@ -388,14 +418,14 @@ function PayByDaysCard({ plansData }: { plansData: Parameters<typeof buildPlanVi
     >
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-          Pay by days
+          {t('account.payByDays.label')}
         </span>
         <span
           className="rounded-[4px] border border-[color-mix(in_oklab,var(--color-warning)_35%,transparent)]
                      bg-[color-mix(in_oklab,var(--color-warning)_12%,transparent)] px-[10px] py-1 font-mono
                      text-[10px] uppercase tracking-[0.08em] text-warning"
         >
-          Flexible
+          {t('account.payByDays.flexible')}
         </span>
       </div>
 
@@ -404,13 +434,12 @@ function PayByDaysCard({ plansData }: { plansData: Parameters<typeof buildPlanVi
           {groupFmt.format(pricePerDay)}
         </span>
         <span className="font-mono text-[12px] uppercase tracking-[0.08em] text-text-muted">
-          {CURRENCY} / day
+          {t('account.payByDays.perDayUnit', { currency: CURRENCY })}
         </span>
       </div>
 
       <p className="mt-[10px] text-[13px] leading-[1.6] text-text-secondary">
-        Pay any amount, any time — no renewal window. We convert it to days and add them on top of
-        your current access.
+        {t('account.payByDays.body')}
       </p>
 
       <div className="mt-8 flex items-stretch gap-2">
@@ -452,10 +481,13 @@ function PayByDaysCard({ plansData }: { plansData: Parameters<typeof buildPlanVi
 
       <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border-subtle pt-[14px]">
         <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-          {groupFmt.format(amount)} ÷ {groupFmt.format(pricePerDay)} /day
+          {t('account.payByDays.ratio', {
+            amount: groupFmt.format(amount),
+            price: groupFmt.format(pricePerDay),
+          })}
         </span>
         <span className="font-mono text-[18px] font-semibold text-warning">
-          = {days} {days === 1 ? 'day' : 'days'}
+          {t('account.payByDays.resultDays', { count: days })}
         </span>
       </div>
 
@@ -468,11 +500,11 @@ function PayByDaysCard({ plansData }: { plansData: Parameters<typeof buildPlanVi
                    hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40
                    disabled:hover:brightness-100"
       >
-        {days > 0 ? `Top up ${days} ${days === 1 ? 'day' : 'days'}` : 'Enter an amount'}
+        {days > 0 ? t('account.payByDays.topUp', { count: days }) : t('account.payByDays.enterAmount')}
       </button>
 
       <div className="mt-3 text-center font-mono text-[11px] text-text-dim">
-        from 1 day, any amount · one-time payment
+        {t('account.payByDays.footnote')}
       </div>
     </div>
   );

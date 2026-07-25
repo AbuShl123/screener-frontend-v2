@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { formatDate } from '@/lib/i18n';
 import { useMe } from '@/features/auth';
 import { BillingHeader } from '../components/BillingHeader';
 import { buildPlanViews } from '../catalog';
+import { resolvePlanDisplay } from '../planCopy';
 import { useDebouncedValue } from '../useDebouncedValue';
 import { usePayAsYouGoDays, usePlans } from '../queries';
 
@@ -29,8 +32,10 @@ const groupFmt = new Intl.NumberFormat('en-US');
  * of a blank input.
  */
 export function PayByDaysPage() {
+  const { t } = useTranslation('billing');
   const { data: plansData } = usePlans();
   const paygPlan = buildPlanViews(plansData).find((p) => p.code === 'pay_as_you_go');
+  const paygCopy = paygPlan ? resolvePlanDisplay(t, paygPlan) : null;
   const me = useMe();
 
   // Defaults to the current per-day rate (fallback-first, like the rest of the catalog) so
@@ -48,7 +53,7 @@ export function PayByDaysPage() {
 
   const amountDisplay = amount ? groupFmt.format(amount) : '';
   const daysDisplay = days != null ? groupFmt.format(days) : '—';
-  const daysWord = days === 1 ? 'day' : 'days';
+  const daysWord = t('payByDays.daysUnit', { count: days ?? 0 });
 
   let accessUntil: string | null = null;
   if (days != null && days >= 1) {
@@ -58,7 +63,8 @@ export function PayByDaysPage() {
     const base = currentExpiry && currentExpiry > now ? currentExpiry : now;
     const end = new Date(base);
     end.setDate(end.getDate() + days);
-    accessUntil = end.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+    // Date localizes (§6.4); the numeric day count above stays fixed-format (§10.1).
+    accessUntil = formatDate(end.toISOString(), { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
   return (
@@ -72,21 +78,20 @@ export function PayByDaysPage() {
           className="mb-[14px] self-start font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim
                      transition-colors hover:text-text-secondary"
         >
-          ← Billing · Plans
+          ← {t('nav.plansBreadcrumb')}
         </button>
 
         <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
           <div>
             <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em] text-warning">
-              Pay by days · Flexible
+              {t('payByDays.eyebrow')}
             </div>
             <h1 className="m-0 max-w-[22ch] text-[38px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
-              How much do you want to top up?
+              {t('payByDays.title')}
             </h1>
           </div>
           <p className="m-0 max-w-[40ch] text-[15px] leading-[1.6] text-text-muted">
-            Enter any amount. We'll convert it to days of full terminal access at the current daily
-            rate — no auto-renewal, access ends when your days run out.
+            {t('payByDays.subtitle')}
           </p>
         </div>
 
@@ -94,7 +99,7 @@ export function PayByDaysPage() {
           {/* ===== Amount editor ===== */}
           <section className="flex flex-col rounded-[14px] border border-border bg-surface px-7 pb-[26px] pt-7">
             <div className="mb-[22px] font-mono text-[11px] uppercase tracking-[0.08em] text-text-secondary">
-              Enter amount
+              {t('payByDays.enterAmount')}
             </div>
 
             <label
@@ -125,7 +130,7 @@ export function PayByDaysPage() {
                        bg-[color-mix(in_oklab,#f5b84d_8%,#0d1219)] p-7"
           >
             <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-warning">
-              That buys you
+              {t('payByDays.buysYou')}
             </span>
 
             <div className="flex flex-1 flex-col justify-center py-[14px]">
@@ -141,13 +146,13 @@ export function PayByDaysPage() {
                 <span className="font-mono text-[20px] text-text-muted">{daysWord}</span>
               </div>
               <div className="mt-[14px] text-[14px] leading-[1.5] text-text-muted">
-                of full terminal access
+                {t('payByDays.fullAccess')}
               </div>
             </div>
 
             <div className="flex items-center justify-between border-t border-border-subtle pt-4">
               <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-                Access until
+                {t('payByDays.accessUntil')}
               </span>
               <span
                 className={`font-mono text-[13px] ${accessUntil ? 'text-text-secondary' : 'text-text-dim'}`}
@@ -156,13 +161,13 @@ export function PayByDaysPage() {
               </span>
             </div>
 
-            {paygPlan && (
+            {paygPlan && paygCopy && (
               <div className="mt-3 flex items-center justify-between border-t border-border-subtle pt-4">
                 <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-                  Rate
+                  {t('payByDays.rate')}
                 </span>
                 <span className="font-mono text-[13px] text-text-secondary">
-                  {paygPlan.price} {paygPlan.unit}
+                  {paygPlan.price} {paygCopy.unit}
                 </span>
               </div>
             )}
@@ -178,10 +183,10 @@ export function PayByDaysPage() {
               className="whitespace-nowrap rounded-[4px] bg-[color-mix(in_oklab,#f5b84d_22%,transparent)] px-[7px] py-[3px]
                          font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-warning"
             >
-              Invalid
+              {t('payByDays.invalidBadge')}
             </span>
             <span className="text-[14px] text-text-secondary">
-              Invalid amount — try entering a different amount.
+              {t('payByDays.invalidMessage')}
             </span>
           </div>
         )}
@@ -194,7 +199,7 @@ export function PayByDaysPage() {
       >
         <div className="flex flex-wrap items-baseline gap-[14px]">
           <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-warning">
-            Pay by days
+            {t('payByDays.summaryLabel')}
           </span>
           <span className="font-mono text-[15px] text-text-strong">
             {amountDisplay || '0'} {CURRENCY}
@@ -211,7 +216,7 @@ export function PayByDaysPage() {
             className="font-mono text-[12px] uppercase tracking-[0.08em] text-text-dim transition-colors
                        hover:text-text-secondary"
           >
-            Cancel
+            {t('payByDays.cancel')}
           </button>
           <button
             type="button"
@@ -222,7 +227,7 @@ export function PayByDaysPage() {
                        hover:brightness-[1.08] disabled:cursor-not-allowed disabled:opacity-40
                        disabled:hover:brightness-100"
           >
-            Continue to payment →
+            {t('payByDays.continue')}
           </button>
         </div>
       </div>

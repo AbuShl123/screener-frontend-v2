@@ -1,9 +1,9 @@
 # i18n Progress — What's Already Localized
 
-> Status snapshot. Written 2026-07-25. Companion to the design doc at
-> [`.claude/plans/i18n-localization.md`](../plans/i18n-localization.md) — read that first for the
-> *why* behind every decision below. This document only tracks *what has actually landed* against
-> that plan's §9 rollout phasing, so a future session doesn't have to re-derive it from diffs.
+> Status snapshot. Written 2026-07-25, updated 2026-07-25 (phase 4 review). Companion to the design
+> doc at [`.claude/plans/i18n-localization.md`](../plans/i18n-localization.md) — read that first for
+> the *why* behind every decision below. This document only tracks *what has actually landed*
+> against that plan's §9 rollout phasing, so a future session doesn't have to re-derive it from diffs.
 
 ## Where things stand against the plan's phasing (§9)
 
@@ -12,16 +12,16 @@
 | 1. Infra | ✅ Done, committed | `main` branch, via merge |
 | 2. Auth slice | ✅ Done, committed | Commit `713cdd3` — "Localize auth slice (i18n phase 2)" |
 | 3. Landing | ✅ Done, **not committed** | Working tree changes only — see below |
-| 4. Billing | ❌ Not started | `billing.json` is still `{}` in both locales |
+| 4. Billing | ✅ Done, **not committed** | Working tree changes only — see below; reviewed 2026-07-25 |
 | 5. Settings | ❌ Not started | `settings.json` is still `{}` in both locales |
 | 6. Orderbook / dashboard | ❌ Not started | `orderbook.json` is still `{}` in both locales |
 | 7. Shared `common` + language switcher | ⚠️ Partial | `common.json` has a handful of keys (see below); no switcher UI exists |
-| 8. Russian copy pass | ⚠️ Ongoing per-slice | RU translations were written alongside each extracted slice (not deferred to the end) — auth and landing RU copy already exist and read as real Russian, not machine stubs |
+| 8. Russian copy pass | ⚠️ Ongoing per-slice | RU translations were written alongside each extracted slice (not deferred to the end) — auth, landing, and billing RU copy already exist and read as real Russian, not machine stubs |
 
-**If you're resuming this work:** phases 1–3 are the reference implementation. Copy their pattern
-exactly for billing/settings/orderbook rather than re-deriving conventions — the deviations below
-(dev-dependency install, `Trans` usage, `ParseKeys` typing) are things the plan didn't spell out in
-full but the actual code now demonstrates.
+**If you're resuming this work:** phases 1–4 are the reference implementation. Copy their pattern
+exactly for settings/orderbook rather than re-deriving conventions — the deviations below
+(dev-dependency install, `Trans` usage, `ParseKeys` typing, the `planCopy.ts` resolver) are things
+the plan didn't spell out in full but the actual code now demonstrates.
 
 ## Phase 1: Infra
 
@@ -118,16 +118,48 @@ What's done:
   until billing is extracted.
 - Both `en/landing.json` and `ru/landing.json` are fully written with real Russian copy, not stubs.
 
+## Phase 4: Billing (uncommitted — working tree only)
+
+**Not yet committed.** `git status` shows `catalog.ts`, `historyView.ts`, `index.ts`, every billing
+page and the three billing components, `landing/components/PlanCard.tsx`, the new
+`billing/planCopy.ts`, and both `lib/i18n/locales/{en,ru}/billing.json` as modified/added-but-unstaged.
+
+What's done (reviewed 2026-07-25 — `npm run typecheck` passes, key parity between `en`/`ru`
+verified programmatically, no residual English strings found in a spot-check of every changed file):
+
+- **§6.2 server-map/labelKey pattern, done via a shared resolver.** `catalog.ts`'s `PLAN_COPY` now
+  stores `nameKey`/`badgeKey`/`descKey` (stable `billing:` keys) plus `unit`/`perDay` as
+  `{ key, values }` descriptors — the module stays free of the i18next instance, exactly per the
+  plan's recommended option (a). New **`billing/planCopy.ts`** (`resolvePlanDisplay(t, plan)`) is
+  the single render-time resolver every consumer shares: `PlanChoiceCard`, `PaymentMethodPage`,
+  `CheckoutStubPage`, and — closing the gap phase 3 explicitly left open — landing's `PlanCard.tsx`,
+  which previously rendered `plan.name`/`plan.badge`/etc. as raw English and now resolves them
+  through a `billing`-bound `t` alongside its own `landing`-namespace chrome. `historyView.ts`'s
+  `STATUS`/`REASON`/`SOURCE` maps follow the identical labelKey shape, and fallback-to-raw-code is
+  preserved everywhere (`PLAN[order.planCode] ?? order.planCode`, unmapped `REASON`, etc.).
+- **§6.4 date-format swap actually happened.** `historyView.ts`'s `fmtDate`/`fmtDateTime`,
+  `PaymentStatusPage.tsx`, `PayByDaysPage.tsx`, and `PaymentMethodPage.tsx` all now compute dates via
+  the shared `formatDate` (`@/lib/i18n`) instead of a hardcoded locale string. All remaining
+  `Intl.NumberFormat('en-US')` call sites (`catalog.ts`, `historyView.ts`, and four billing pages)
+  are confirmed to be **amount/day-count formatting only** — correctly left fixed-format per §10.1 —
+  not leftover date code.
+- **§6.5 backend-message discipline mostly holds, with one pre-existing exception left as-is.**
+  `PaymentStatusPage`'s `reasonDetail` verbatim-on-purpose case is preserved with its explanatory
+  comment, matching the plan's locked exception in §10 Q2. `PaymentMethodPage.tsx`'s checkout-order
+  error path, however, still echoes `ApiError.message` verbatim for *any* 4xx (only the fully-generic
+  fallback got a translated key) — this predates phase 4 (pre-existing behavior, not a regression
+  introduced by this slice) and now carries a comment citing §6.5, but it doesn't fully match the
+  plan's *preferred* status-driven-key approach. Not a blocker; worth a follow-up note if a later
+  session touches that page.
+- Both `en/billing.json` and `ru/billing.json` are fully written with real Russian copy (259/267 raw
+  keys respectively — the only divergence is expected CLDR plural-form counts: `en` needs
+  `_one`/`_other`, `ru` needs `_one`/`_few`/`_many`; every base key lines up 1:1 across locales).
+- `PLAN_NAME_KEYS` (derived from `PLAN_COPY`) is reused by `historyView.ts`'s `PLAN` map, keeping
+  plan-name resolution in one place across `AccountPage`, `BillingHistoryPage`, and
+  `PaymentStatusPage`.
+
 ## What's explicitly NOT done yet
 
-- **Billing** (`billing.json` empty both locales): `catalog.ts` (`PLAN_COPY`), `historyView.ts`
-  (`STATUS`/`REASON`/`SOURCE` label maps + `buildTimeline` defaults), and every billing page
-  (`ChoosePlanPage`, `PayByDaysPage`, `PaymentMethodPage`, `PaymentStatusPage`,
-  `BillingHistoryPage`, `AccountPage`, `CheckoutStubPage`) are still 100% English. This is also
-  where the plan's §6.4 date-format swap (`formatDate` replacing the hardcoded `'en-US'`/`'en-GB'`
-  literals in `catalog.ts`, `historyView.ts`, `AccountPage.tsx`, `PayByDaysPage.tsx`,
-  `PaymentMethodPage.tsx`, `PaymentStatusPage.tsx`) has not happened — `formatDate` exists and
-  works (used nowhere yet outside its own module).
 - **Settings** (`settings.json` empty both locales): classification rules UI, notification prefs
   UI, and `settings/rulesValidation.ts` (including its own `'en-US'` number-format literal) are all
   still English.
@@ -155,6 +187,9 @@ What's done:
 - Run `npm run typecheck` after adding keys — the `i18next.d.ts` augmentation means a key typo in a
   component or a `ru` file that drifts from `en`'s shape both surface as compiler errors, which is
   the only automated gate this repo has for i18n correctness.
-- Before starting billing (phase 4), re-read plan §6.2 and §6.4 together — it's the phase that
-  exercises both the labelKey server-map pattern *and* the date-formatting swap in the same slice,
-  and the plan calls this out as the hardest one.
+- Billing (phase 4) is now the second reference for the labelKey server-map pattern — copy
+  `planCopy.ts`'s single-resolver shape (rather than re-deriving per page) if settings/orderbook
+  need something similar for their own code-keyed maps.
+- `settings/rulesValidation.ts` has its own `'en-US'` number-format literal (noted below, phase 5) —
+  confirm against §10.1 whether it's a number (stays fixed) or a date (should swap to `formatDate`)
+  before touching it.

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/Button';
-import type { PlanView } from '@/features/billing';
+import { resolvePlanDisplay, type PlanView } from '@/features/billing';
 
 /**
  * One pricing card (plan §8.3, dark section per the v2 template). Purely
@@ -19,6 +19,10 @@ export function PlanCard({
   onStart: (code: string) => void;
 }) {
   const { t } = useTranslation('landing');
+  // Plan name/badge/desc/unit/per-day live in the `billing` namespace (§6.2) — resolve them
+  // with a billing-bound `t`; the card's own "Start now" chrome stays in `landing`.
+  const { t: tb } = useTranslation('billing');
+  const copy = resolvePlanDisplay(tb, plan);
   return (
     <div
       className={`flex flex-col rounded-[14px] px-5 py-[22px] ${
@@ -29,9 +33,9 @@ export function PlanCard({
     >
       <div className="mb-4 flex min-h-5 items-center justify-between">
         <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-          {plan.name}
+          {copy.name}
         </span>
-        {plan.badge && (
+        {copy.badge && (
           <span
             className={`rounded-[4px] px-[7px] py-[3px] font-mono text-[9px] tracking-[0.08em] ${
               plan.badgeStyle === 'accent'
@@ -39,19 +43,19 @@ export function PlanCard({
                 : 'bg-[color-mix(in_oklab,#4ea8ff_22%,transparent)] text-accent'
             }`}
           >
-            {plan.badge}
+            {copy.badge}
           </span>
         )}
       </div>
 
       <div className="font-mono text-[26px] tracking-[-0.01em] text-text">{plan.price}</div>
       <div className="mb-[14px] mt-1 font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-        {plan.unit}
+        {copy.unit}
       </div>
 
-      <p className="mb-4 flex-1 text-[14px] leading-[1.55] text-text-muted">{plan.desc}</p>
+      <p className="mb-4 flex-1 text-[14px] leading-[1.55] text-text-muted">{copy.desc}</p>
 
-      <div className="mb-4 font-mono text-[11px] text-text-dim">{plan.perDay}</div>
+      <div className="mb-4 font-mono text-[11px] text-text-dim">{copy.perDay}</div>
 
       {plan.highlight ? (
         <button

@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import type { ParseKeys } from 'i18next';
 import { BrandMark } from '@/components/BrandMark';
 import { Button } from '@/components/Button';
 import { logout, useMe } from '@/features/auth';
@@ -11,13 +13,14 @@ import { logout, useMe } from '@/features/auth';
  * content. Kept inside the `billing` feature (both consumers live here); not barrel-exported.
  */
 
-const NAV: { label: string; path: string }[] = [
-  { label: 'Account', path: '/account' },
-  { label: 'Billing history', path: '/account/billing-history' },
+const NAV: { labelKey: ParseKeys<'billing'>; path: string }[] = [
+  { labelKey: 'accountNav.account', path: '/account' },
+  { labelKey: 'accountNav.billingHistory', path: '/account/billing-history' },
 ];
-const DISABLED_NAV = ['Security', 'Settings'];
+const DISABLED_NAV: ParseKeys<'billing'>[] = ['accountNav.security', 'accountNav.settings'];
 
 export function AccountLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation('billing');
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const me = useMe();
@@ -43,7 +46,7 @@ export function AccountLayout({ children }: { children: ReactNode }) {
             onClick={() => navigate('/dashboard')}
             className="inline-flex items-center gap-2 !py-3"
           >
-            Go to dashboard
+            {t('accountNav.goDashboard')}
             <svg
               width="17"
               height="17"
@@ -65,7 +68,7 @@ export function AccountLayout({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 flex-1">
         {/* ===== Left nav ===== */}
         <nav className="flex w-56 flex-none flex-col gap-[2px] border-r border-border-subtle py-5">
-          {NAV.map(({ label, path }) => {
+          {NAV.map(({ labelKey, path }) => {
             const active = pathname === path;
             return (
               <button
@@ -78,17 +81,17 @@ export function AccountLayout({ children }: { children: ReactNode }) {
                     : 'flex cursor-pointer items-center border-l-2 border-transparent py-[11px] pl-5 pr-[22px] text-left text-[14px] text-text-muted transition-colors hover:text-text'
                 }
               >
-                {label}
+                {t(labelKey)}
               </button>
             );
           })}
-          {DISABLED_NAV.map((label) => (
+          {DISABLED_NAV.map((labelKey) => (
             <div
-              key={label}
+              key={labelKey}
               className="flex cursor-not-allowed items-center border-l-2 border-transparent py-[11px] pl-5 pr-[22px]
                          text-[14px] text-text-muted opacity-60"
             >
-              {label}
+              {t(labelKey)}
             </div>
           ))}
           <div className="flex-1" />
@@ -116,7 +119,7 @@ export function AccountLayout({ children }: { children: ReactNode }) {
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              {loggingOut ? 'Signing out…' : 'Sign out'}
+              {loggingOut ? t('accountNav.signingOut') : t('accountNav.signOut')}
             </button>
           </div>
         </nav>

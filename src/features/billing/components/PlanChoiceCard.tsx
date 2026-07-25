@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import type { PlanView } from '../catalog';
+import { resolvePlanDisplay } from '../planCopy';
 
 /**
  * One selectable plan card for the Choose Plan grid (plan §6). Billing-local — NOT
@@ -11,6 +13,8 @@ import type { PlanView } from '../catalog';
  * amber ring + tint + amber CTA.
  */
 export function PlanChoiceCard({ plan, onSelect }: { plan: PlanView; onSelect: () => void }) {
+  const { t } = useTranslation('billing');
+  const copy = resolvePlanDisplay(t, plan);
   const cardClass = plan.highlight
     ? 'border-2 border-warning bg-[color-mix(in_oklab,#f5b84d_9%,#0d1219)]'
     : 'border border-border bg-input';
@@ -23,9 +27,9 @@ export function PlanChoiceCard({ plan, onSelect }: { plan: PlanView; onSelect: (
     <div className={`flex min-h-[440px] flex-col rounded-[14px] px-6 py-7 text-left ${cardClass}`}>
       <div className="mb-[18px] flex min-h-5 items-center justify-between">
         <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-          {plan.name}
+          {copy.name}
         </span>
-        {plan.badge && (
+        {copy.badge && (
           <span
             className={`rounded-[4px] px-[7px] py-[3px] font-mono text-[9px] uppercase tracking-[0.08em] ${
               plan.badgeStyle === 'accent'
@@ -33,19 +37,19 @@ export function PlanChoiceCard({ plan, onSelect }: { plan: PlanView; onSelect: (
                 : 'bg-[color-mix(in_oklab,#4ea8ff_22%,transparent)] text-accent'
             }`}
           >
-            {plan.badge}
+            {copy.badge}
           </span>
         )}
       </div>
 
       <div className="font-mono text-[30px] tracking-[-0.01em] text-text">{plan.price}</div>
       <div className="mb-4 mt-1 font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-        {plan.unit}
+        {copy.unit}
       </div>
 
-      <p className="mb-[18px] flex-1 text-[14px] leading-[1.55] text-text-muted">{plan.desc}</p>
+      <p className="mb-[18px] flex-1 text-[14px] leading-[1.55] text-text-muted">{copy.desc}</p>
 
-      <div className="mb-[18px] font-mono text-[11px] text-text-dim">{plan.perDay}</div>
+      <div className="mb-[18px] font-mono text-[11px] text-text-dim">{copy.perDay}</div>
 
       <button
         type="button"
@@ -55,7 +59,7 @@ export function PlanChoiceCard({ plan, onSelect }: { plan: PlanView; onSelect: (
                     focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
                     focus-visible:outline-accent ${ctaClass}`}
       >
-        {plan.highlight ? 'Start now' : 'Choose plan'}
+        {plan.highlight ? t('planCard.start') : t('planCard.choose')}
       </button>
     </div>
   );
