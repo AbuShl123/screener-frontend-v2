@@ -69,7 +69,7 @@ function buildAccessView(profile: UserProfile): AccessView {
       heroVar: HERO.warning,
       pillLabel: 'Trial',
       statusLine: accessExpiresAt ? `Trial until ${fmtDate(accessExpiresAt)}` : 'Free trial',
-      daysNote: `${left} of 7 days left`,
+      daysNote: `${left} days left`,
       meterPct: clampPct(left / 7),
       subLine:
         'You’re on the free trial. Subscribe to keep access when it ends — no card was taken.',

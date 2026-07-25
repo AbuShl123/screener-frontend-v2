@@ -220,9 +220,29 @@ sudo journalctl -u screener -f
 
 ## Step 6 — Deploy the Frontend
 
+The frontend is now a Vite-built React app, not a single hand-written `index.html`. **Build
+locally, then sync the whole `dist/` directory** — `npm run build` produces `dist/index.html` plus
+a `dist/assets/` folder of content-hashed JS/CSS chunks (e.g. `index-a1b2c3.js`). Config
+(`VITE_API_BASE_URL` etc., see [`src/config/env.ts`](src/config/env.ts)) is baked into the bundle
+at build time from `.env.production` — there's no server-side env file for the frontend like there
+is for the backend.
+
+```bash
+npm run build
+```
+
 ```bash
 sudo mkdir -p /var/www/screener
-sudo cp index.html /var/www/screener/
+```
+
+Sync with `rsync --delete` (not `scp`/`cp`) so stale hashed chunks from previous builds get removed
+instead of accumulating forever:
+
+```bash
+rsync -av --delete dist/ user@your-server-ip:/var/www/screener/
+```
+
+```bash
 sudo chown -R www-data:www-data /var/www/screener
 ```
 
@@ -242,9 +262,19 @@ server {
     root /var/www/screener;
     index index.html;
 
-    # Serve frontend
+    # Content-hashed build assets (dist/assets/*) — filenames change on every
+    # build, so it's safe to cache them forever.
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # index.html must never be cached — it's the pointer to the current
+    # build's hashed asset filenames. A stale cached index.html would keep
+    # requesting JS/CSS chunks that a newer deploy already deleted.
     location / {
         try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache";
     }
 
     # Proxy REST API to Spring Boot
@@ -316,7 +346,7 @@ const socket = new WebSocket("wss://tc-screener.com/ws");
 | `/opt/screener/.env` | DB_URL, DB_USER, DB_PASSWORD, JWT_SECRET set; owned root:root, mode 600 |
 | Spring Boot as systemd service | JVM heap capped at 1 GB, ZGC enabled, EnvironmentFile wired |
 | Flyway migrations | Tables created automatically on first startup (check logs) |
-| Nginx | Serves HTML + reverse proxies /api/ and /ws |
+| Nginx | Serves `dist/` (immutable cache for `/assets/`, no-cache for `index.html`) + reverse proxies /api/ and /ws |
 | Certbot | Free SSL cert, auto-renews every 90 days |
 
 ---
@@ -345,11 +375,13 @@ scp -P 3333 target/screener.jar root@185.39.31.59:/opt/screener/app.jar
 ssh -p 3333 root@185.39.31.59 "sudo chown www-data:www-data /opt/screener/app.jar && sudo systemctl restart screener"
 ```
 
-**Frontend** — just replace the file:
+**Frontend** — rebuild, then sync the whole `dist/` directory with `--delete` so old hashed chunks
+from previous builds don't pile up:
 
 ```bash
-scp -P 3333 index.html root@185.39.31.59:/tmp/index.html
-ssh -p 3333 root@185.39.31.59 "sudo cp /tmp/index.html /var/www/screener/"
+npm run build
+rsync -av --delete -e "ssh -p 3333" dist/ root@185.39.31.59:/var/www/screener/
+ssh -p 3333 root@185.39.31.59 "sudo chown -R www-data:www-data /var/www/screener"
 ```
 
 **Check logs at any time:**
