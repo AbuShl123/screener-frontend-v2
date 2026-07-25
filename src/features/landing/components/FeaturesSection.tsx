@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { FEATURES, type FeatureGlyph } from '../constants';
 
 /** The leading glyph of a feature card (rotated accent square or a mono text glyph). */
@@ -23,6 +24,7 @@ function Glyph({ glyph }: { glyph: FeatureGlyph }) {
  * anchor jumps.
  */
 export function FeaturesSection() {
+  const { t } = useTranslation('landing');
   return (
     <section
       id="features"
@@ -30,29 +32,28 @@ export function FeaturesSection() {
     >
       <div className="mx-auto max-w-[1140px] px-8 pb-[80px] pt-[72px]">
         <div className="mb-[14px] font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
-          What you get
+          {t('features.eyebrow')}
         </div>
         <h2 className="mb-3 text-[34px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
-          Your thresholds. Your tickers. Sub-second.
+          {t('features.title')}
         </h2>
         <p className="mb-10 max-w-[60ch] text-[15px] leading-[1.6] text-text-muted">
-          A high-throughput engine watches the market so you don't have to — and tells you, out
-          loud, when something matters.
+          {t('features.subtitle')}
         </p>
 
         <div className="grid grid-cols-3 gap-4">
           {FEATURES.map((feature) => (
             <div
-              key={feature.label}
+              key={feature.labelKey}
               className="rounded-[10px] border border-border bg-input px-[22px] py-6"
             >
               <div className="mb-[14px] flex items-center gap-2">
                 <Glyph glyph={feature.glyph} />
                 <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-                  {feature.label}
+                  {t(feature.labelKey)}
                 </span>
               </div>
-              <p className="text-[14px] leading-[1.6] text-text-secondary">{feature.body}</p>
+              <p className="text-[14px] leading-[1.6] text-text-secondary">{t(feature.bodyKey)}</p>
             </div>
           ))}
         </div>

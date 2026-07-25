@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/Button';
 import type { PlanView } from '@/features/billing';
 
@@ -17,6 +18,7 @@ export function PlanCard({
   plan: PlanView;
   onStart: (code: string) => void;
 }) {
+  const { t } = useTranslation('landing');
   return (
     <div
       className={`flex flex-col rounded-[14px] px-5 py-[22px] ${
@@ -56,11 +58,11 @@ export function PlanCard({
           onClick={() => onStart(plan.code)}
           className="w-full rounded-[8px] bg-warning px-[14px] py-[14px] font-sans text-[15px] font-medium leading-none text-[#1a1206] transition-[filter] duration-150 hover:brightness-[1.08]"
         >
-          Start now
+          {t('pricing.startNow')}
         </button>
       ) : (
         <Button variant="outline" onClick={() => onStart(plan.code)}>
-          Start now
+          {t('pricing.startNow')}
         </Button>
       )}
     </div>

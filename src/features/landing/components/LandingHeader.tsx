@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { BrandMark } from '@/components/BrandMark';
 import { Button } from '@/components/Button';
 import { useLandingNav } from '../useLandingNav';
@@ -11,6 +12,7 @@ const navLinkClass =
  * authenticated gets a single Go to dashboard.
  */
 export function LandingHeader() {
+  const { t } = useTranslation('landing');
   const { isAuthed, signIn, createAccount, goDashboard } = useLandingNav();
 
   return (
@@ -19,10 +21,10 @@ export function LandingHeader() {
 
       <nav className="flex items-center gap-7 font-mono text-[11px] uppercase tracking-[0.08em]">
         <a href="#pricing" className={navLinkClass}>
-          Pricing
+          {t('header.pricing')}
         </a>
         <a href="#features" className={navLinkClass}>
-          Features
+          {t('header.features')}
         </a>
       </nav>
 
@@ -34,7 +36,7 @@ export function LandingHeader() {
             onClick={goDashboard}
             className="whitespace-nowrap px-[18px] py-[10px] text-[14px]"
           >
-            Go to dashboard
+            {t('header.goDashboard')}
           </Button>
         ) : (
           <>
@@ -44,7 +46,7 @@ export function LandingHeader() {
               onClick={signIn}
               className="min-w-[92px] whitespace-nowrap px-[18px] py-[10px] text-[14px]"
             >
-              Sign in
+              {t('header.signIn')}
             </Button>
             <Button
               variant="primary"
@@ -52,7 +54,7 @@ export function LandingHeader() {
               onClick={createAccount}
               className="whitespace-nowrap px-[18px] py-[10px] text-[14px]"
             >
-              Create account
+              {t('header.createAccount')}
             </Button>
           </>
         )}
