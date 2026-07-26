@@ -1,6 +1,6 @@
 # i18n Progress — What's Already Localized
 
-> Status snapshot. Written 2026-07-25, updated 2026-07-25 (phase 4 review). Companion to the design
+> Status snapshot. Written 2026-07-25, updated 2026-07-25 (phase 4 committed). Companion to the design
 > doc at [`.claude/plans/i18n-localization.md`](../plans/i18n-localization.md) — read that first for
 > the *why* behind every decision below. This document only tracks *what has actually landed*
 > against that plan's §9 rollout phasing, so a future session doesn't have to re-derive it from diffs.
@@ -11,17 +11,18 @@
 |---|---|---|
 | 1. Infra | ✅ Done, committed | `main` branch, via merge |
 | 2. Auth slice | ✅ Done, committed | Commit `713cdd3` — "Localize auth slice (i18n phase 2)" |
-| 3. Landing | ✅ Done, **not committed** | Working tree changes only — see below |
-| 4. Billing | ✅ Done, **not committed** | Working tree changes only — see below; reviewed 2026-07-25 |
-| 5. Settings | ❌ Not started | `settings.json` is still `{}` in both locales |
+| 3. Landing | ✅ Done, committed | Commit `9b6d15a` — "Localize landing page (i18n phase 3)" |
+| 4. Billing | ✅ Done, committed | Commit `585052e` — "Localize billing (i18n phase 4)"; reviewed 2026-07-25 |
+| 5. Settings | ✅ Done, **not committed** | Working tree changes only — see below; `settings.json` fully populated in both locales |
 | 6. Orderbook / dashboard | ❌ Not started | `orderbook.json` is still `{}` in both locales |
 | 7. Shared `common` + language switcher | ⚠️ Partial | `common.json` has a handful of keys (see below); no switcher UI exists |
 | 8. Russian copy pass | ⚠️ Ongoing per-slice | RU translations were written alongside each extracted slice (not deferred to the end) — auth, landing, and billing RU copy already exist and read as real Russian, not machine stubs |
 
-**If you're resuming this work:** phases 1–4 are the reference implementation. Copy their pattern
-exactly for settings/orderbook rather than re-deriving conventions — the deviations below
-(dev-dependency install, `Trans` usage, `ParseKeys` typing, the `planCopy.ts` resolver) are things
-the plan didn't spell out in full but the actual code now demonstrates.
+**If you're resuming this work:** phases 1–4 are all committed and are the reference implementation
+(phase 5, settings, is done but uncommitted in the working tree). Copy their pattern exactly for
+orderbook rather than re-deriving conventions — the deviations below (dev-dependency install,
+`Trans` usage, `ParseKeys` typing, the `planCopy.ts` resolver) are things the plan didn't spell out
+in full but the actual code now demonstrates.
 
 ## Phase 1: Infra
 
@@ -86,13 +87,11 @@ later phase should copy:
 - Both `en/auth.json` and `ru/auth.json` are fully written (not stubs) — real Russian prose, not
   machine-translation placeholders.
 
-## Phase 3: Landing (uncommitted — working tree only)
+## Phase 3: Landing (commit `9b6d15a`)
 
-**Not yet committed.** `git status` shows all of `landing/components/{CtaSection,FeaturesSection,
-HeroSection,LandingFooter,LandingHeader,PlanCard,PricingSection}.tsx`, `landing/constants.ts`, and
-both `lib/i18n/locales/{en,ru}/landing.json` as modified-but-unstaged. Verify with `git diff` before
-assuming this work is on `main` or even safely stashable — it is a real, working, typechecked slice
-that simply hasn't been committed yet.
+Covers all of `landing/components/{CtaSection,FeaturesSection,HeroSection,LandingFooter,
+LandingHeader,PlanCard,PricingSection}.tsx`, `landing/constants.ts`, and both
+`lib/i18n/locales/{en,ru}/landing.json`.
 
 What's done:
 
@@ -118,11 +117,11 @@ What's done:
   until billing is extracted.
 - Both `en/landing.json` and `ru/landing.json` are fully written with real Russian copy, not stubs.
 
-## Phase 4: Billing (uncommitted — working tree only)
+## Phase 4: Billing (commit `585052e`)
 
-**Not yet committed.** `git status` shows `catalog.ts`, `historyView.ts`, `index.ts`, every billing
-page and the three billing components, `landing/components/PlanCard.tsx`, the new
-`billing/planCopy.ts`, and both `lib/i18n/locales/{en,ru}/billing.json` as modified/added-but-unstaged.
+Covers `catalog.ts`, `historyView.ts`, `index.ts`, every billing page and the three billing
+components, `landing/components/PlanCard.tsx`, the new `billing/planCopy.ts`, and both
+`lib/i18n/locales/{en,ru}/billing.json`.
 
 What's done (reviewed 2026-07-25 — `npm run typecheck` passes, key parity between `en`/`ru`
 verified programmatically, no residual English strings found in a spot-check of every changed file):
@@ -158,11 +157,45 @@ verified programmatically, no residual English strings found in a spot-check of 
   plan-name resolution in one place across `AccountPage`, `BillingHistoryPage`, and
   `PaymentStatusPage`.
 
+## Phase 5: Settings (uncommitted — working tree only)
+
+**Not yet committed.** `git status` shows all eight `settings/components/*.tsx`
+(`SettingsModal`, `ClassificationRules`, `RuleEditor`, `CustomRulesList`, `NotificationsSettings`,
+`MinimumTierControl`, `MutedTickers`, `UpgradeNote`), `settings/rulesValidation.ts`, both
+`lib/i18n/locales/{en,ru}/settings.json`, and the two `validation.json` files as modified-but-unstaged.
+It is a real, working, typechecked slice — verify with `git diff` before assuming it's on `main`.
+
+What's done (`npm run typecheck` passes; `en`/`ru` key parity verified programmatically — 51/51
+settings keys, 9/9 validation keys; no residual user-facing English in the components):
+
+- Every settings component now reads its namespace via `useTranslation('settings')` and `t('…')` —
+  the modal chrome (title/close/`SOON`/nav labels), both Notifications sub-panes (minimum-tier
+  heading/desc/caption, muted-tickers search/list/empty), and the whole Classification-rules pane
+  (intro, search, results, the inline `RuleEditor`, the custom-rules list, and the shared
+  `UpgradeNote`).
+- **§6.3 validation-key pattern reused exactly as auth did.** `rulesValidation.ts`'s `validateTiers`
+  now returns `{ ok: false, errorKey }` carrying a stable `validation:rule.*` KEY (the two new
+  `validation.json` keys `rule.minNotional` / `rule.maxDistance`) instead of English prose; the
+  `RuleEditor` resolves it at render with `useValidationError()` (the same resolver the auth pages
+  use). The backend-400 branch still shows `ApiError.message` verbatim (§6.5 user-safe envelope),
+  and the generic save failure is now `t('rules.editor.saveError')`.
+- **§6.2 labelKey pattern for the two in-component code maps.** `SettingsModal`'s `NAV` array and
+  `RuleEditor`'s `SOURCE_KEY` map now store `ParseKeys<'settings'>` key literals (not English
+  labels), resolved with `t()` at render — same shape as landing's `constants.ts` and billing's
+  maps, with the typo-guard `ParseKeys` gives.
+- **Interpolation, never concatenation** (§5): the minimum-tier caption is one key with `{{min}}` /
+  `{{prev}}` (`notifications.tier.caption`), the "no tickers match" empties interpolate `{{query}}`,
+  and the `N MUTED` / `N CUSTOM` badges interpolate `{{n}}`. The badges deliberately use a plain
+  `{{n}}` variable, **not** i18next's `count`, so they stay fixed invariant labels rather than
+  pulling in CLDR plural forms for a stylized mono chip.
+- **§10.1 honored — no number localization.** `rulesValidation.ts`'s `formatNotional` keeps its
+  `toLocaleString('en-US')` untouched: it formats a **notional (a number)**, which stays fixed-format
+  per §10.1 — it is not a date, so it was correctly left alone (this resolves the phase-5 flag the
+  practical-notes section raised).
+- Both `en/settings.json` and `ru/settings.json` are fully written with real Russian copy, not stubs.
+
 ## What's explicitly NOT done yet
 
-- **Settings** (`settings.json` empty both locales): classification rules UI, notification prefs
-  UI, and `settings/rulesValidation.ts` (including its own `'en-US'` number-format literal) are all
-  still English.
 - **Orderbook / dashboard** (`orderbook.json` empty both locales): `DashboardHeader`,
   `OrderbookCard`, `NotificationPanel`, `NotificationCard`, `NotificationHandle`, `SortMenu`,
   `DashboardPage` — all still English. Note the plan's hard rule still applies untouched: nothing
@@ -188,8 +221,8 @@ verified programmatically, no residual English strings found in a spot-check of 
   component or a `ru` file that drifts from `en`'s shape both surface as compiler errors, which is
   the only automated gate this repo has for i18n correctness.
 - Billing (phase 4) is now the second reference for the labelKey server-map pattern — copy
-  `planCopy.ts`'s single-resolver shape (rather than re-deriving per page) if settings/orderbook
-  need something similar for their own code-keyed maps.
-- `settings/rulesValidation.ts` has its own `'en-US'` number-format literal (noted below, phase 5) —
-  confirm against §10.1 whether it's a number (stays fixed) or a date (should swap to `formatDate`)
-  before touching it.
+  `planCopy.ts`'s single-resolver shape (rather than re-deriving per page) if orderbook
+  needs something similar for its own code-keyed maps.
+- `settings/rulesValidation.ts`'s `'en-US'` number-format literal was confirmed (phase 5) to be a
+  **notional** — a number, so left fixed-format per §10.1. When touching orderbook, apply the same
+  test to each `Intl` literal: a date localizes via `formatDate`, a number stays as-is.

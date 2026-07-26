@@ -1,1 +1,77 @@
-{}
+{
+  "modal": {
+    "title": "Settings",
+    "close": "Close",
+    "soon": "SOON",
+    "nav": {
+      "notifications": "Notifications",
+      "rules": "Classification rules",
+      "appearance": "Appearance"
+    }
+  },
+  "notifications": {
+    "tier": {
+      "heading": "Minimum tier",
+      "desc": "Every order book level is classified 0–4 by significance. Notify only levels at or above the tier you pick — anything lower is filtered out.",
+      "captionAll": "All tiers notify — nothing filtered by rank",
+      "caption": "Notifying tier {{min}}–4 · tier 1–{{prev}} filtered out"
+    },
+    "muted": {
+      "heading": "Muted tickers",
+      "desc": "Muted ticker + market books never trigger notifications. Search across all tickers to mute one.",
+      "count": "{{n}} MUTED",
+      "searchPlaceholder": "Search tickers to mute…",
+      "loading": "Loading tickers…",
+      "loadError": "Couldn't load tickers",
+      "noMatch": "No tickers match “{{query}}”",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "empty": "No muted tickers — every book can notify"
+    }
+  },
+  "rules": {
+    "heading": "Per-ticker thresholds",
+    "infoTitle": "What does this mean?",
+    "info": "Each tier pairs a minimum notional with a maximum distance from mid-price. A custom rule replaces the default entirely for one ticker + market — all four tiers, every time.",
+    "count": "{{n}} CUSTOM",
+    "searchPlaceholder": "Search tickers to edit rules…",
+    "loading": "Loading tickers…",
+    "loadError": "Couldn't load tickers",
+    "noMatch": "No tickers match “{{query}}”",
+    "editRules": "Edit rules ›",
+    "loadingDefaults": "Loading defaults…",
+    "custom": "CUSTOM",
+    "yourRules": {
+      "heading": "Your custom rules",
+      "desc": "Tickers overriding the defaults. Every other ticker follows the default rule.",
+      "empty": "No custom rules — all tickers follow the defaults"
+    },
+    "list": {
+      "edit": "Edit",
+      "revert": "Revert",
+      "reverting": "Reverting…"
+    },
+    "editor": {
+      "source": {
+        "custom": "CUSTOM RULE",
+        "highLiq": "HIGH-LIQ DEFAULT",
+        "default": "DEFAULT"
+      },
+      "close": "Close editor",
+      "col": {
+        "tier": "TIER",
+        "minNotional": "MIN NOTIONAL (USD)",
+        "maxDistance": "MAX DISTANCE FROM MID"
+      },
+      "saveError": "Couldn't save — try again",
+      "save": "Save custom rule",
+      "saving": "Saving…",
+      "revert": "Revert to default",
+      "reverting": "Reverting…"
+    }
+  },
+  "upgrade": {
+    "required": "Active subscription required",
+    "cta": "Upgrade →"
+  }
+}

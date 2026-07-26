@@ -13,5 +13,9 @@
     "confirmRequired": "Подтвердите пароль",
     "mismatch": "Пароли не совпадают",
     "required": "Введите пароль"
+  },
+  "rule": {
+    "minNotional": "minNotional должно быть ≥ 0",
+    "maxDistance": "maxDistance должно быть в диапазоне (0, 0.1]"
   }
 }

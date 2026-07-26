@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
 import { fmtSymbol, marketBadge } from '@/features/orderbook/format';
 import { TIER_COLORS } from '@/features/orderbook/tiers';
 import { ApiError } from '@/lib/api';
+import { useValidationError } from '@/lib/i18n';
 import { useDeleteRule, useSaveRule } from '../queries';
 import type { RuleTarget, TierThreshold } from '../schemas';
 import { toEditorRows, validateTiers, type EditorRow } from '../rulesValidation';
@@ -23,10 +26,10 @@ import { UpgradeNote, isSubscriptionError } from './UpgradeNote';
 
 type Source = 'CUSTOM' | 'HIGH_LIQ' | 'DEFAULT';
 
-const SOURCE_LABEL: Record<Source, string> = {
-  CUSTOM: 'CUSTOM RULE',
-  HIGH_LIQ: 'HIGH-LIQ DEFAULT',
-  DEFAULT: 'DEFAULT',
+const SOURCE_KEY: Record<Source, ParseKeys<'settings'>> = {
+  CUSTOM: 'rules.editor.source.custom',
+  HIGH_LIQ: 'rules.editor.source.highLiq',
+  DEFAULT: 'rules.editor.source.default',
 };
 
 interface RuleEditorProps {
@@ -38,8 +41,11 @@ interface RuleEditorProps {
 }
 
 export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: RuleEditorProps) {
+  const { t } = useTranslation('settings');
+  const resolveValidation = useValidationError();
   const [rows, setRows] = useState<EditorRow[]>(() => toEditorRows(initialTiers));
-  const [validationError, setValidationError] = useState<string | null>(null);
+  // Holds a `validation:` KEY (not English) so it resolves in the active language at render.
+  const [validationErrorKey, setValidationErrorKey] = useState<string | null>(null);
 
   const saveRule = useSaveRule();
   const deleteRule = useDeleteRule();
@@ -53,15 +59,15 @@ export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: 
   const onSave = () => {
     const result = validateTiers(rows);
     if (!result.ok) {
-      setValidationError(result.error);
+      setValidationErrorKey(result.errorKey);
       return;
     }
-    setValidationError(null);
+    setValidationErrorKey(null);
     saveRule.mutate({ target, tiers: result.tiers });
   };
 
   const onRevert = () => {
-    setValidationError(null);
+    setValidationErrorKey(null);
     // On success the override is gone — collapse the editor (the book now follows the default).
     deleteRule.mutate(target, { onSuccess: onClose });
   };
@@ -69,12 +75,12 @@ export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: 
   // Error precedence: a client-side validation message wins; otherwise surface the mutation error.
   const mutationError = saveRule.error ?? deleteRule.error;
   const showUpgrade = isSubscriptionError(mutationError);
-  const errorText = validationError
-    ? validationError
+  const errorText = validationErrorKey
+    ? resolveValidation(validationErrorKey)
     : mutationError && !showUpgrade
       ? mutationError instanceof ApiError && mutationError.status === 400
-        ? mutationError.message // user-safe backend validation envelope
-        : "Couldn't save — try again"
+        ? mutationError.message // user-safe backend validation envelope (§6.5); shown verbatim
+        : t('rules.editor.saveError')
       : null;
 
   return (
@@ -96,13 +102,13 @@ export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: 
               : 'border-border-input text-text-muted'
           }`}
         >
-          {SOURCE_LABEL[source]}
+          {t(SOURCE_KEY[source])}
         </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={onClose}
-          title="Close editor"
+          title={t('rules.editor.close')}
           className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-lg border
                      border-border-input text-[14px] leading-none text-text-secondary transition-colors
                      hover:bg-white/5 hover:text-text-strong"
@@ -114,9 +120,9 @@ export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: 
       {/* Threshold grid */}
       <div className="flex flex-col gap-2 px-4 pt-3.5 pb-2">
         <div className="grid grid-cols-[58px_1fr_1fr] gap-2.5 px-0.5 pb-0.5 font-mono text-[9px] tracking-[0.1em] text-text-muted">
-          <span>TIER</span>
-          <span>MIN NOTIONAL (USD)</span>
-          <span>MAX DISTANCE FROM MID</span>
+          <span>{t('rules.editor.col.tier')}</span>
+          <span>{t('rules.editor.col.minNotional')}</span>
+          <span>{t('rules.editor.col.maxDistance')}</span>
         </div>
         {rows.map((row, i) => (
           <div key={row.tier} className="grid grid-cols-[58px_1fr_1fr] items-center gap-2.5">
@@ -180,7 +186,7 @@ export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: 
             className="rounded-lg border border-danger/45 px-4 py-2 text-[13px] text-danger transition-colors
                        hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {deleteRule.isPending ? 'Reverting…' : 'Revert to default'}
+            {deleteRule.isPending ? t('rules.editor.reverting') : t('rules.editor.revert')}
           </button>
         )}
         <button
@@ -190,7 +196,7 @@ export function RuleEditor({ target, source, initialTiers, isCustom, onClose }: 
           className="rounded-lg bg-accent px-[18px] py-2 text-[13px] font-medium text-bg transition-[filter]
                      hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saveRule.isPending ? 'Saving…' : 'Save custom rule'}
+          {saveRule.isPending ? t('rules.editor.saving') : t('rules.editor.save')}
         </button>
       </div>
     </section>

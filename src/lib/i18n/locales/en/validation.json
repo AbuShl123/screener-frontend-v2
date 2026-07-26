@@ -13,5 +13,9 @@
     "confirmRequired": "Please confirm your password",
     "mismatch": "Passwords do not match",
     "required": "Password is required"
+  },
+  "rule": {
+    "minNotional": "minNotional must be ≥ 0",
+    "maxDistance": "maxDistance must be in (0, 0.1]"
   }
 }

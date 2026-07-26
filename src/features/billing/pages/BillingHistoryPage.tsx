@@ -102,7 +102,7 @@ export function BillingHistoryPage() {
               <PaymentsEmpty onChoosePlan={() => navigate('/billing/plans')} />
             ) : (
               <div>
-                <div className="grid grid-cols-[128px_1fr_132px_104px_28px] gap-4 border-b border-border-subtle px-4 py-[14px]">
+                <div className="grid grid-cols-[128px_1fr_132px_120px_28px] gap-4 border-b border-border-subtle px-4 py-[14px]">
                   <HeaderCell>{t('history.cols.status')}</HeaderCell>
                   <HeaderCell>{t('history.cols.plan')}</HeaderCell>
                   <HeaderCell align="right">{t('history.cols.amount')}</HeaderCell>
@@ -126,7 +126,7 @@ export function BillingHistoryPage() {
           </div>
         ) : (
           <div className="mt-1">
-            <div className="grid grid-cols-[104px_128px_1fr_116px_152px] gap-4 border-b border-border-subtle px-4 py-[14px]">
+            <div className="grid grid-cols-[120px_128px_1fr_116px_152px] gap-4 border-b border-border-subtle px-4 py-[14px]">
               <HeaderCell>{t('history.cols.date')}</HeaderCell>
               <HeaderCell>{t('history.cols.source')}</HeaderCell>
               <HeaderCell>{t('history.cols.grant')}</HeaderCell>
@@ -234,7 +234,7 @@ function OrderRow({
     >
       <div
         onClick={onToggle}
-        className="grid cursor-pointer grid-cols-[128px_1fr_132px_104px_28px] items-center gap-4 px-4 py-[15px] transition-colors hover:bg-white/[0.02]"
+        className="grid cursor-pointer grid-cols-[128px_1fr_132px_120px_28px] items-center gap-4 px-4 py-[15px] transition-colors hover:bg-white/[0.02]"
       >
         <div className="flex items-center gap-[7px]">
           <span className="h-[6px] w-[6px] flex-none rounded-full" style={{ background: meta.color }} />
@@ -506,7 +506,7 @@ function GrantRow({
   const order = grant.source === 'PURCHASE' ? grant.order : null;
 
   return (
-    <div className="grid grid-cols-[104px_128px_1fr_116px_152px] items-center gap-4 border-b border-border-subtle px-4 py-4">
+    <div className="grid grid-cols-[120px_128px_1fr_116px_152px] items-center gap-4 border-b border-border-subtle px-4 py-4">
       <span className="font-mono text-[13px] text-text-secondary">{fmtDate(grant.createdAt)}</span>
       <div>
         <span

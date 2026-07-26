@@ -55,12 +55,15 @@ export function toEditorRows(tiers: TierThreshold[]): EditorRow[] {
 
 export type ValidateResult =
   | { ok: true; tiers: TierThreshold[] }
-  | { ok: false; error: string };
+  | { ok: false; errorKey: string };
 
 /**
  * Parse the four editor rows into wire tiers, enforcing the backend's per-tier rules with
  * matching messages. Structural guarantees (exactly four distinct tiers 1–4, valid market,
  * tracked symbol, ≤200 targets) are ensured by the UI and need no runtime guard here.
+ *
+ * i18n (§6.3): validation copy is our own, so `errorKey` is a stable `validation:` KEY
+ * resolved with `useValidationError()` where the editor renders it — never English here.
  */
 export function validateTiers(rows: EditorRow[]): ValidateResult {
   const tiers: TierThreshold[] = [];
@@ -69,10 +72,10 @@ export function validateTiers(rows: EditorRow[]): ValidateResult {
     const maxDistance = parsePercent(row.maxDistancePct);
 
     if (!Number.isFinite(minNotional) || minNotional < 0) {
-      return { ok: false, error: 'minNotional must be ≥ 0' };
+      return { ok: false, errorKey: 'validation:rule.minNotional' };
     }
     if (!Number.isFinite(maxDistance) || maxDistance <= 0 || maxDistance > 0.1) {
-      return { ok: false, error: 'maxDistance must be in (0, 0.1]' };
+      return { ok: false, errorKey: 'validation:rule.maxDistance' };
     }
     tiers.push({ tier: row.tier, minNotional, maxDistance });
   }
