@@ -1,6 +1,6 @@
 # i18n Progress — What's Already Localized
 
-> Status snapshot. Written 2026-07-25, updated 2026-07-25 (phase 4 committed). Companion to the design
+> Status snapshot. Written 2026-07-25, updated 2026-07-26 (phase 5 committed). Companion to the design
 > doc at [`.claude/plans/i18n-localization.md`](../plans/i18n-localization.md) — read that first for
 > the *why* behind every decision below. This document only tracks *what has actually landed*
 > against that plan's §9 rollout phasing, so a future session doesn't have to re-derive it from diffs.
@@ -13,16 +13,15 @@
 | 2. Auth slice | ✅ Done, committed | Commit `713cdd3` — "Localize auth slice (i18n phase 2)" |
 | 3. Landing | ✅ Done, committed | Commit `9b6d15a` — "Localize landing page (i18n phase 3)" |
 | 4. Billing | ✅ Done, committed | Commit `585052e` — "Localize billing (i18n phase 4)"; reviewed 2026-07-25 |
-| 5. Settings | ✅ Done, **not committed** | Working tree changes only — see below; `settings.json` fully populated in both locales |
+| 5. Settings | ✅ Done, committed | Commit `68c395d` — "Localize settings (i18n phase 5)"; `settings.json` fully populated in both locales |
 | 6. Orderbook / dashboard | ❌ Not started | `orderbook.json` is still `{}` in both locales |
 | 7. Shared `common` + language switcher | ⚠️ Partial | `common.json` has a handful of keys (see below); no switcher UI exists |
 | 8. Russian copy pass | ⚠️ Ongoing per-slice | RU translations were written alongside each extracted slice (not deferred to the end) — auth, landing, and billing RU copy already exist and read as real Russian, not machine stubs |
 
-**If you're resuming this work:** phases 1–4 are all committed and are the reference implementation
-(phase 5, settings, is done but uncommitted in the working tree). Copy their pattern exactly for
-orderbook rather than re-deriving conventions — the deviations below (dev-dependency install,
-`Trans` usage, `ParseKeys` typing, the `planCopy.ts` resolver) are things the plan didn't spell out
-in full but the actual code now demonstrates.
+**If you're resuming this work:** phases 1–5 are all committed and are the reference implementation.
+Copy their pattern exactly for orderbook rather than re-deriving conventions — the deviations below
+(dev-dependency install, `Trans` usage, `ParseKeys` typing, the `planCopy.ts` resolver) are things
+the plan didn't spell out in full but the actual code now demonstrates.
 
 ## Phase 1: Infra
 
@@ -157,13 +156,12 @@ verified programmatically, no residual English strings found in a spot-check of 
   plan-name resolution in one place across `AccountPage`, `BillingHistoryPage`, and
   `PaymentStatusPage`.
 
-## Phase 5: Settings (uncommitted — working tree only)
+## Phase 5: Settings (commit `68c395d`)
 
-**Not yet committed.** `git status` shows all eight `settings/components/*.tsx`
-(`SettingsModal`, `ClassificationRules`, `RuleEditor`, `CustomRulesList`, `NotificationsSettings`,
-`MinimumTierControl`, `MutedTickers`, `UpgradeNote`), `settings/rulesValidation.ts`, both
-`lib/i18n/locales/{en,ru}/settings.json`, and the two `validation.json` files as modified-but-unstaged.
-It is a real, working, typechecked slice — verify with `git diff` before assuming it's on `main`.
+Covers all eight `settings/components/*.tsx` (`SettingsModal`, `ClassificationRules`, `RuleEditor`,
+`CustomRulesList`, `NotificationsSettings`, `MinimumTierControl`, `MutedTickers`, `UpgradeNote`),
+`settings/rulesValidation.ts`, both `lib/i18n/locales/{en,ru}/settings.json`, and the two
+`validation.json` files.
 
 What's done (`npm run typecheck` passes; `en`/`ru` key parity verified programmatically — 51/51
 settings keys, 9/9 validation keys; no residual user-facing English in the components):
