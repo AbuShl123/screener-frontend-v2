@@ -14,7 +14,7 @@
 | 3. Landing | ✅ Done, committed | Commit `9b6d15a` — "Localize landing page (i18n phase 3)" |
 | 4. Billing | ✅ Done, committed | Commit `585052e` — "Localize billing (i18n phase 4)"; reviewed 2026-07-25 |
 | 5. Settings | ✅ Done, committed | Commit `68c395d` — "Localize settings (i18n phase 5)"; `settings.json` fully populated in both locales |
-| 6. Orderbook / dashboard | ❌ Not started | `orderbook.json` is still `{}` in both locales |
+| 6. Orderbook / dashboard | ✅ Done, uncommitted | `orderbook.json` fully populated in both locales (33/33 key parity); see Phase 6 section below |
 | 7. Shared `common` + language switcher | ⚠️ Partial | `common.json` has a handful of keys (see below); no switcher UI exists |
 | 8. Russian copy pass | ⚠️ Ongoing per-slice | RU translations were written alongside each extracted slice (not deferred to the end) — auth, landing, and billing RU copy already exist and read as real Russian, not machine stubs |
 
@@ -192,12 +192,55 @@ settings keys, 9/9 validation keys; no residual user-facing English in the compo
   practical-notes section raised).
 - Both `en/settings.json` and `ru/settings.json` are fully written with real Russian copy, not stubs.
 
+## Phase 6: Orderbook / dashboard (uncommitted)
+
+Covers `DashboardHeader`, `SortMenu`, `NotificationPanel`, `NotificationCard`,
+`NotificationHandle`, `DashboardPage`, `sortOrderbooks.ts`, and both
+`lib/i18n/locales/{en,ru}/orderbook.json`.
+
+What's done (`npm run typecheck` passes; `en`/`ru` key parity verified programmatically — 37/37
+keys; no residual user-facing English in the localized components):
+
+- Every localized component reads `useTranslation('orderbook')` and `t('…')` — the header
+  (watchlist label, ticker count, QTY/$ USD toggle, Settings/Account/Log out chrome), the sort
+  control, the whole notifications rail (panel title/`N NEW`/clear/collapse/search/empty and every
+  `NotificationCard`'s BID/ASK + PRICE/NOTIONAL/SIZE/DIST labels), the `NotificationHandle`
+  tooltips, and the dashboard's reconnecting notice + all four `EmptyState` messages.
+- **§6.2 labelKey pattern for `SORT_OPTIONS`.** `sortOrderbooks.ts` now stores
+  `labelKey: ParseKeys<'orderbook'>` (not English `label`) per option; `SortMenu` resolves it with
+  `t()` at render — same shape as landing's `constants.ts` and settings' `SettingsModal` NAV.
+- **Interpolation, never concatenation** (§5): the ticker count (`header.tickers`) and `N NEW`
+  (`panel.new`) use a plain `{{n}}` variable — **not** i18next's `count` — so the stylized mono
+  chips stay fixed invariant labels rather than pulling in CLDR plural forms, exactly as the
+  settings badges do.
+- **⛔ HARD RULE honored — the order-book firehose stays i18n-free in the render body**, with one
+  deliberate escape hatch (plan §6.4, "Escape hatch: hover-only / event-triggered strings").
+  `OrderbookCard`'s `Row` is the one per-animation-frame surface; its hover-only "First seen … ago"
+  tooltip (`card.firstSeen` key) is now localized, but the translate call lives in an `onMouseEnter`
+  handler that writes straight to `e.currentTarget.title`, not in the render body — so it runs once
+  per hover, never once per WS-driven re-render. Crucially, `Row` does **not** use
+  `useTranslation()` — that hook would sit on the per-frame render path (cheap, but not zero, and
+  against the spirit of the rule). Instead it reads the `i18n` singleton directly
+  (`i18n.t('orderbook:card.firstSeen', …)`), the same "access the module-level singleton on the hot
+  path rather than subscribing" shape as `session.ts`/`feedClient.ts`. The tooltip is written
+  imperatively (never rendered in JSX), so it needs no reactivity — the next hover after a language
+  switch reads the current locale on its own — leaving the render body **truly** i18n-free: no
+  `t()`, no hook, nothing. The tooltip's age string itself is fully localized too (RU `15мин`,
+  `20сек`, `1ч 30мин`, `2д 4ч`): `fmtAge` in `format.ts` stays pure and i18n-free by taking its
+  day/hour/minute/second **suffixes as a parameter** (defaulting to the English `d`/`h`/`m`/`s`),
+  and the `onMouseEnter` handler resolves those four suffixes via the `i18n` singleton
+  (`orderbook:card.age.*`) and passes them in — so the localization rides the same once-per-hover
+  path, never the formatter and never a render. All other localized components (header, sort
+  menu, notification panel/cards, dashboard states) re-render only on discrete events (mode/status/
+  keys changes, notification pushes, open/search toggles), never per frame, so `t()` in their render
+  bodies is safe too. `marketBadge`'s PERP/SPOT labels (shared formatter in `format.ts`, not in the
+  plan's phase-6 inventory) stay English, matching the phase-5 precedent where `MutedTickers`
+  renders `badge.label` untranslated.
+- Both `en/orderbook.json` and `ru/orderbook.json` are fully written with real Russian copy
+  (BID/ASK → БИД/АСК, market/metric labels translated), not stubs.
+
 ## What's explicitly NOT done yet
 
-- **Orderbook / dashboard** (`orderbook.json` empty both locales): `DashboardHeader`,
-  `OrderbookCard`, `NotificationPanel`, `NotificationCard`, `NotificationHandle`, `SortMenu`,
-  `DashboardPage` — all still English. Note the plan's hard rule still applies untouched: nothing
-  here should ever call `t()` / read `i18n.language` on the per-frame path.
 - **Shared `common` components**: `Button`, `Banner`, `TextField`, `PasswordField`, `Card`,
   `BrandMark`, `TickerStrip` have not been individually audited for default text — `common.json`
   only has the keys that auth/landing needed so far (e.g. `errors.generic`), not a full pass.

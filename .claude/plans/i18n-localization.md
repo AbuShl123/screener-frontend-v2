@@ -220,6 +220,34 @@ swap is a real scope item — flag it explicitly; it's not covered by string ext
 > number in the stream, revisit this document and the §10.1 decision first — do not quietly add an
 > `Intl` call to the flush.
 
+**Escape hatch: hover-only / event-triggered strings may still translate, if computed off the
+render path.** The rule above bans i18n from the *render body* of a hot-path component — it does
+not ban translating a string that's cheap to defer entirely off the render cadence. Concrete case:
+`OrderbookCard`'s `Row` shows a "First seen X ago" tooltip on hover. The tooltip only matters while
+a user is actively hovering one specific row — which is rare relative to render frequency — so
+instead of building the string (translated or not) in the render body on every WS-driven re-render,
+`Row` computes it lazily inside `onMouseEnter` and writes it straight to the DOM node
+(`e.currentTarget.title = i18n.t(...)`), never touching React state or the render body. This makes
+the translate call run once per hover, zero times per render — fully decoupled from the firehose, so
+translating it doesn't reopen the hard rule.
+
+**Read the i18n singleton directly here — do NOT reach for `useTranslation()`.** A tooltip written
+imperatively on hover is never rendered in JSX, so it needs no *reactivity*: there is no rendered
+string that must update when the language changes (the next hover reads the current locale on its
+own). Calling `useTranslation('orderbook')` in the `Row` body would put a hook call back on the
+per-frame render path — cheap, but not zero, and it contradicts the very principle this hatch exists
+to uphold. Instead import the `i18n` singleton (`@/lib/i18n`) and call `i18n.t('orderbook:card.firstSeen', …)`
+inside the handler. This is the same "read the module-level singleton via `getState()`/direct
+access on the hot path rather than subscribing" shape used by `session.ts` and `feedClient.ts`, and
+it keeps the render body *truly* i18n-free — no `t()`, no hook, nothing.
+
+**The pattern, generalized:** if a hot-path component has a string that's only observed on a discrete
+user action (hover, click, focus) rather than on every render, move its computation (translated or
+not) into that action's event handler and translate it there via the `i18n` singleton, not a hook.
+That's a legitimate way to add translation near a hot-path component; quietly calling `t()` inside
+the render body "because it's cheap" — or leaving a `useTranslation()` hook on the per-frame path —
+is not — see the precedent-erosion reasoning above.
+
 ### 6.5 Backend `ApiError` messages
 
 The backend's `{ message, status, path }` envelope carries **English** prose

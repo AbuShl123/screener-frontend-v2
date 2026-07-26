@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NotificationCard } from '@/features/orderbook/components/NotificationCard';
 import { matches } from '@/features/orderbook/notifications/notificationSearch';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
@@ -28,6 +29,7 @@ interface NotificationPanelProps {
  * every push — plan §8a).
  */
 export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanelProps) {
+  const { t } = useTranslation('orderbook');
   const [query, setQuery] = useState('');
   const notifications = useNotificationStore((s) => s.notifications);
   const unread = useNotificationStore((s) => s.unread);
@@ -46,7 +48,7 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
 
   return (
     <aside
-      aria-label="Notifications"
+      aria-label={t('panel.title')}
       className="fixed top-[60px] right-0 bottom-0 z-50 flex flex-col border-l border-border
                  bg-surface shadow-card
                  [transition:transform_260ms_cubic-bezier(0.22,0.61,0.36,1)]"
@@ -59,9 +61,9 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
       {/* Header */}
       <div className="flex flex-none items-center justify-between gap-3 border-b border-border px-[18px] py-4">
         <div className="flex items-baseline gap-2.5">
-          <span className="text-[15px] font-semibold text-text">Notifications</span>
+          <span className="text-[15px] font-semibold text-text">{t('panel.title')}</span>
           <span className="font-mono text-[10px] tracking-[0.08em] text-accent">
-            {unread} NEW
+            {t('panel.new', { n: unread })}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -70,8 +72,8 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
             type="button"
             onClick={clear}
             disabled={notifications.length === 0}
-            title="Clear all notifications"
-            aria-label="Clear all notifications"
+            title={t('panel.clearAll')}
+            aria-label={t('panel.clearAll')}
             className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg
                        border border-border-input text-text-secondary transition-colors
                        hover:bg-white/5 hover:text-danger
@@ -96,8 +98,8 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
           <button
             type="button"
             onClick={onClose}
-            title="Collapse"
-            aria-label="Collapse notifications"
+            title={t('panel.collapse')}
+            aria-label={t('panel.collapseAria')}
             className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg
                        border border-border-input text-[16px] leading-none text-text-secondary
                        transition-colors hover:bg-white/5 hover:text-text-strong"
@@ -128,7 +130,7 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search ticker, price, size…"
+            placeholder={t('panel.searchPlaceholder')}
             className="w-full rounded-lg border border-border-input bg-input py-[9px] pr-3 pl-8
                        font-mono text-[12px] tracking-[0.02em] text-text outline-none
                        focus:border-accent"
@@ -140,7 +142,7 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
       <div className="scrollbar-slim flex flex-1 flex-col gap-2.5 overflow-y-auto px-[14px] py-[14px]">
         {visible.length === 0 ? (
           <div className="py-7 text-center font-mono text-[12px] tracking-[0.04em] text-text-dim">
-            No matching notifications
+            {t('panel.empty')}
           </div>
         ) : (
           visible.map((n) => (
