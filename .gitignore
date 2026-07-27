@@ -1,3 +1,5 @@
+deploy-frontend.sh
+
 # Dependencies
 node_modules/
 

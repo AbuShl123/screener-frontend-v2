@@ -5,6 +5,11 @@
  * active language inside the instance and re-renders `useTranslation` subscribers on
  * `changeLanguage`.
  *
+ * Language is currently PINNED to `FORCED_LOCALE` (ru): every user is Russian, so we do not
+ * detect the browser language. The browser-language detector is deliberately not wired in — to
+ * restore detection, set `FORCED_LOCALE` to `null` in config.ts and re-add `.use(LanguageDetector)`
+ * + `detection: detectionOptions` below (see `.claude/docs/i18n-progress.md`).
+ *
  * Two languages of static chrome are small enough to bundle synchronously, so there's no
  * Suspense/loading dance: every namespace for every locale is embedded in the `resources`
  * map below and shipped in the main bundle.
@@ -12,13 +17,12 @@
 
 import { createInstance } from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
 import { config } from '@/config/env';
 import {
   NAMESPACES,
   DEFAULT_NAMESPACE,
   SUPPORTED_LOCALES,
-  detectionOptions,
+  FORCED_LOCALE,
   resolveLocale,
 } from './config';
 
@@ -64,18 +68,19 @@ export const resources = {
 export const i18n = createInstance();
 
 i18n
-  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
-    // `en` is the fallback floor; the detector picks the active language above it.
+    // Pinned active language — every user is Russian, so no browser detection (see header).
+    // `?? config.defaultLocale` keeps this safe if FORCED_LOCALE is ever set back to null.
+    lng: FORCED_LOCALE ?? config.defaultLocale,
+    // `en` is the fallback floor for any key missing from the active language.
     fallbackLng: config.defaultLocale,
     supportedLngs: [...SUPPORTED_LOCALES],
     // Only match on the base language ('ru-RU' → 'ru'); we ship no region variants.
     load: 'languageOnly',
     ns: [...NAMESPACES],
     defaultNS: DEFAULT_NAMESPACE,
-    detection: detectionOptions,
     interpolation: {
       // React already escapes interpolated values — double-escaping would corrupt them.
       escapeValue: false,

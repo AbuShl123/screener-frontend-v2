@@ -41,9 +41,20 @@ export const DEFAULT_NAMESPACE: Namespace = 'common';
 export const LOCALE_STORAGE_KEY = 'screener.locale';
 
 /**
+ * Forced UI locale. All current users are Russian, so the app is pinned to Russian and does
+ * **not** detect the browser language (nor read a saved `localStorage` choice). This is the one
+ * knob: set it back to `null` to restore browser/localStorage detection via `detectionOptions`
+ * below (see the revert note in index.ts and `.claude/docs/i18n-progress.md`).
+ */
+export const FORCED_LOCALE: Locale | null = 'ru';
+
+/**
  * Browser-language-detector options. Order: an explicit saved choice wins (`localStorage`),
  * else the browser's language (`navigator`), else the configured default is the floor
  * (`fallbackLng` in index.ts). `caches: ['localStorage']` persists a `changeLanguage` call.
+ *
+ * NOTE: currently inactive — `FORCED_LOCALE` above pins the language, so the detector is not
+ * wired into the i18next instance. Kept here so restoring detection is a one-line revert.
  */
 export const detectionOptions = {
   order: ['localStorage', 'navigator'],

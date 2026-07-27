@@ -1,6 +1,6 @@
 # i18n Progress — What's Already Localized
 
-> Status snapshot. Written 2026-07-25, updated 2026-07-26 (phase 5 committed). Companion to the design
+> Status snapshot. Written 2026-07-25, updated 2026-07-27 (language pinned to Russian). Companion to the design
 > doc at [`.claude/plans/i18n-localization.md`](../plans/i18n-localization.md) — read that first for
 > the *why* behind every decision below. This document only tracks *what has actually landed*
 > against that plan's §9 rollout phasing, so a future session doesn't have to re-derive it from diffs.
@@ -57,8 +57,10 @@ Built exactly to the plan's §3–§4 shape, in [`src/lib/i18n/`](../../src/lib/
   handful of cross-cutting keys phases 1–2 needed; `orderbook.json`/`billing.json`/`settings.json`
   are still `{}` placeholders.
 
-No language-switcher UI exists yet (§9 phase 7, deferred) — language is currently
-detection/localStorage-only, exactly as the plan's open question 4 left it.
+No language-switcher UI exists yet (§9 phase 7, deferred). **Language is no longer
+browser-detected** — it is pinned to Russian for all users; see "Language pinned to Russian"
+below. (The detector wiring described here was the original behavior and is documented in that
+section's revert note.)
 
 ## Phase 2: Auth slice (commit `713cdd3`)
 
@@ -238,6 +240,38 @@ keys; no residual user-facing English in the localized components):
   renders `badge.label` untranslated.
 - Both `en/orderbook.json` and `ru/orderbook.json` are fully written with real Russian copy
   (BID/ASK → БИД/АСК, market/metric labels translated), not stubs.
+
+## Language pinned to Russian (2026-07-27)
+
+**Browser-language detection was removed. The app now always renders in Russian, regardless of the
+browser's language or any previously saved choice.**
+
+Why: the entire current user base is Russian. Under the old detector wiring some users were landing
+on English — either because their browser reported an English UI language, or because a stale
+`screener.locale` value was cached in `localStorage`. Pinning the locale removes both failure modes.
+
+What changed (both edits in [`src/lib/i18n/`](../../src/lib/i18n/)):
+
+- **`config.ts`** — added `FORCED_LOCALE: Locale | null = 'ru'`, the single knob. `detectionOptions`
+  is kept but is now **inactive** (documented as such inline) so restoring detection is a one-line
+  revert rather than a rewrite.
+- **`index.ts`** — dropped `.use(LanguageDetector)` and the `detection` option (and the
+  `i18next-browser-languagedetector` import); the instance now inits with `lng: FORCED_LOCALE ??
+  config.defaultLocale`. `fallbackLng` is unchanged (`config.defaultLocale` = `en`), so any key
+  missing from `ru` still falls back to English rather than showing a raw key. Because `lng` is set
+  explicitly, i18next never reads `localStorage`/`navigator` — so a stuck `screener.locale=en` from
+  before this change no longer has any effect.
+
+Notes:
+- The `i18next-browser-languagedetector` dependency is left installed (unused) — no reason to churn
+  `package.json` for a change we may revert.
+- `changeLanguage` still works at runtime if ever needed; nothing about the switcher story (plan
+  open question 4) changed — there is still no switcher UI, and now there is deliberately no
+  auto-detection either.
+
+**To restore browser detection later** (e.g. when English-speaking users arrive): set
+`FORCED_LOCALE = null` in `config.ts`, then re-add `.use(LanguageDetector)` and
+`detection: detectionOptions` in `index.ts` and drop the explicit `lng`. That's the whole revert.
 
 ## What's explicitly NOT done yet
 
