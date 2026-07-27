@@ -1,3 +1,5 @@
+import type { MouseEvent } from 'react';
+import { i18n } from '@/lib/i18n';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import type { BookKey, Level } from '@/features/orderbook/types';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
@@ -110,11 +112,28 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
   const pct =
     maxNotional > 0 ? Math.min(100, Math.max(3, Math.round((notional / maxNotional) * 100))) : 0;
 
+  // i18n HARD RULE (plan §6.4) still holds: this Row re-renders per animation frame for
+  // an actively-updating book, so NOTHING i18n — not even a useTranslation() hook call —
+  // runs in the render body. The tooltip is only ever relevant on hover, and it's never
+  // rendered in JSX (written imperatively to the DOM), so it needs no reactivity: we read
+  // the i18n singleton directly inside onMouseEnter. That runs one translate per hover,
+  // zero per render, keeping the render body truly i18n-free. The next hover after a
+  // language switch picks up the new locale on its own — no subscription needed.
+  const handleMouseEnter = (e: MouseEvent<HTMLDivElement>) => {
+    const age = fmtAge(Date.now() - level.firstSeenMillis, {
+      d: i18n.t('orderbook:card.age.d'),
+      h: i18n.t('orderbook:card.age.h'),
+      m: i18n.t('orderbook:card.age.m'),
+      s: i18n.t('orderbook:card.age.s'),
+    });
+    e.currentTarget.title = i18n.t('orderbook:card.firstSeen', { age });
+  };
+
   return (
     <div
       className="relative grid grid-cols-[1fr_72px_56px] items-center gap-3 px-4 py-1
                  hover:bg-white/[0.04]"
-      title={`First seen ${fmtAge(Date.now() - level.firstSeenMillis)} ago`}
+      onMouseEnter={handleMouseEnter}
     >
       {/* Bar layer, capped at the price column (right-[156px] = 72 + 56 + 2×12 gap + 4 slack) */}
       <div className="absolute inset-y-0 left-0 right-[156px]">

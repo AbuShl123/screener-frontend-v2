@@ -15,7 +15,10 @@ export {
 } from './queries';
 
 // Presentation catalog (copy map + fallback-first merge → PlanView[])
-export { buildPlanViews, type PlanView, type PlanCopy } from './catalog';
+export { buildPlanViews, type PlanView, type PlanCopy, type PlanText } from './catalog';
+
+// Render-time resolver for a PlanView's translatable copy (§6.2 labelKey pattern)
+export { resolvePlanDisplay, type PlanDisplay } from './planCopy';
 
 // Server-response schemas & inferred types
 export {

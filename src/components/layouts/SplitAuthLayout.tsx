@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { BrandMark } from '../BrandMark';
 import { TickerStrip } from '../TickerStrip';
 
@@ -31,12 +32,13 @@ export function SplitAuthLayout({
   showTicker = false,
   marketing,
 }: SplitAuthLayoutProps) {
+  const { t } = useTranslation('common');
   return (
     <div className="flex min-h-screen bg-surface">
       <div className="flex flex-[1.2] flex-col justify-between border-r border-border-subtle bg-surface-marketing px-16 pt-11">
         <Link
           to="/"
-          aria-label="Screener home"
+          aria-label={t('nav.home')}
           className="w-fit transition-opacity duration-150 hover:opacity-80"
         >
           <BrandMark />
@@ -55,23 +57,25 @@ export function SplitAuthLayout({
 
 /** The default (login/2a) left-panel content: headline + subtext + order-book preview card. */
 function DefaultMarketing() {
+  const { t } = useTranslation('auth');
   return (
     <>
       <div className="flex flex-col gap-[14px]">
             <h2 className="max-w-[580px] font-sans text-[38px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
-              Every level that matters, in real time.
+              {t('loginMarketing.heading')}
             </h2>
             <p className="max-w-[460px] text-[15px] leading-[1.6] text-text-muted">
-              Live order books for 500+ Binance spot and futures tickers,
-              classified by your rules, streamed in under a second.
+              {t('loginMarketing.body')}
             </p>
           </div>
           <div className="flex w-[440px] flex-col gap-1 rounded-[10px] border border-border bg-input px-5 py-[18px]">
             <div className="mb-2 flex items-baseline justify-between border-b border-border-subtle pb-[10px]">
               <span className="font-mono text-[11px] tracking-[0.08em] text-text-strong">
-                BTCUSDT · ORDER BOOK
+                BTCUSDT · {t('loginMarketing.previewOrderBook')}
               </span>
-              <span className="font-mono text-[11px] text-text-dim">spread 0.2</span>
+              <span className="font-mono text-[11px] text-text-dim">
+                {t('loginMarketing.previewSpread')} 0.2
+              </span>
             </div>
             {ASKS.map((row) => (
               <div key={row.price} className="grid grid-cols-[86px_56px_1fr] items-center gap-3 py-1">

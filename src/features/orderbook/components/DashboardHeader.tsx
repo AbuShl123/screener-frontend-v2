@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logout, useMe } from '@/features/auth';
 import { SortMenu } from '@/features/orderbook/components/SortMenu';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
@@ -35,6 +36,7 @@ export function DashboardHeader({
   onOpenSettings,
   settingsOpen,
 }: DashboardHeaderProps) {
+  const { t } = useTranslation('orderbook');
   const me = useMe();
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -68,9 +70,9 @@ export function DashboardHeader({
 
       {/* Watchlist context (display only) */}
       <div className="flex items-baseline gap-2">
-        <span className="text-[13px] text-text-secondary">Watchlist</span>
+        <span className="text-[13px] text-text-secondary">{t('header.watchlist')}</span>
         <span className="font-mono text-[11px] tracking-[0.06em] text-text-muted">
-          {tickerCount} TICKERS
+          {t('header.tickers', { n: tickerCount })}
         </span>
       </div>
 
@@ -97,7 +99,7 @@ export function DashboardHeader({
                               : 'bg-transparent text-text-secondary hover:text-text-strong'
                           }`}
             >
-              {mode === 'qty' ? 'QTY' : '$ USD'}
+              {mode === 'qty' ? t('header.size.qty') : t('header.size.usd')}
             </button>
           );
         })}
@@ -108,7 +110,7 @@ export function DashboardHeader({
       {/* Settings (opens the overlay; accent border + tinted bg while open) */}
       <button
         type="button"
-        title="Settings"
+        title={t('header.settings')}
         onClick={onOpenSettings}
         className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border text-[16px]
                     transition-colors ${
@@ -129,13 +131,13 @@ export function DashboardHeader({
                    whitespace-nowrap transition-colors hover:bg-white/5 hover:text-text-strong
                    disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loggingOut ? 'Signing out…' : 'Log out'}
+        {loggingOut ? t('header.loggingOut') : t('header.logout')}
       </button>
 
       {/* Profile (initials from /me when available) */}
       <button
         type="button"
-        title="Account"
+        title={t('header.account')}
         onClick={() => navigate('/account')}
         className="inline-flex h-9 w-9 items-center justify-center rounded-full border
                    border-accent/40 bg-accent/[0.18] font-mono text-[12px] font-medium

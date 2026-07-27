@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import type { ParseKeys } from 'i18next';
 import { ApiError } from '@/lib/api';
+import { formatDate } from '@/lib/i18n';
 import { useMe } from '@/features/auth';
 import { BillingHeader } from '../components/BillingHeader';
 import { buildPlanViews } from '../catalog';
+import { resolvePlanDisplay } from '../planCopy';
 import { useCreateOrder, usePayAsYouGoDays, usePlans } from '../queries';
 import type { CreateOrderRequest } from '../schemas';
 import multicardLogo from '../assets/multicard.svg';
@@ -12,14 +16,15 @@ const CURRENCY = 'UZS';
 const groupFmt = new Intl.NumberFormat('en-US');
 
 // Future providers, rendered as disabled "coming soon" placeholders so the layout is
-// already designed for them (design: Payment Method.dc.html § SOON_METHODS). Static copy.
-const SOON_METHODS: { name: string; glyph: string }[] = [
-  { name: 'Visa / Mastercard', glyph: 'VC' },
-  { name: 'Apple Pay', glyph: '' },
-  { name: 'Kaspi', glyph: 'KZ' },
-  { name: 'PayPal', glyph: 'PP' },
-  { name: 'Russian cards (МИР)', glyph: 'RU' },
-  { name: 'Crypto (USDT)', glyph: '₮' },
+// already designed for them (design: Payment Method.dc.html § SOON_METHODS). Names are
+// `billing:` keys (§6.2), resolved with `t()` at render.
+const SOON_METHODS: { nameKey: ParseKeys<'billing'>; glyph: string }[] = [
+  { nameKey: 'paymentMethod.soonMethods.visa', glyph: 'VC' },
+  { nameKey: 'paymentMethod.soonMethods.applePay', glyph: '' },
+  { nameKey: 'paymentMethod.soonMethods.kaspi', glyph: 'KZ' },
+  { nameKey: 'paymentMethod.soonMethods.paypal', glyph: 'PP' },
+  { nameKey: 'paymentMethod.soonMethods.russianCards', glyph: 'RU' },
+  { nameKey: 'paymentMethod.soonMethods.crypto', glyph: '₮' },
 ];
 
 /**
@@ -38,6 +43,7 @@ const SOON_METHODS: { name: string; glyph: string }[] = [
  * inline without leaving the page. The return_url / polling page is the next phase (plan §10).
  */
 export function PaymentMethodPage() {
+  const { t } = useTranslation('billing');
   const [params] = useSearchParams();
   const planCode = params.get('plan') ?? 'monthly';
   const amountStr = params.get('amount'); // present only for pay-as-you-go
@@ -62,15 +68,15 @@ export function PaymentMethodPage() {
   if (!plan) return <UnknownPlanState />;
 
   // ── Summary view model ──
+  const copy = resolvePlanDisplay(t, plan);
   const accessDays = isPayg ? (paygData?.days ?? null) : plan.durationDays;
   const total = isPayg ? amount : plan.amount;
   const totalFmt = groupFmt.format(total);
 
-  const durationLabel =
-    accessDays != null ? `${accessDays} ${accessDays === 1 ? 'day' : 'days'}` : '—';
+  const durationLabel = accessDays != null ? t('plans.dayCount', { count: accessDays }) : '—';
   const planPeriodLabel = isPayg
-    ? `Pay by days · ${durationLabel} of full terminal access`
-    : `${durationLabel} of full terminal access`;
+    ? t('paymentMethod.summary.paygPeriod', { duration: durationLabel })
+    : t('paymentMethod.summary.period', { duration: durationLabel });
 
   // Access until — extend from the user's current expiry if it hasn't lapsed, else from today
   // (mirrors PayByDaysPage's derivation verbatim for correct stacking).
@@ -81,7 +87,8 @@ export function PaymentMethodPage() {
     const base = currentExpiry && currentExpiry > now ? currentExpiry : now;
     const end = new Date(base);
     end.setDate(end.getDate() + accessDays);
-    accessUntil = end.toLocaleDateString('en-US', {
+    // Date localizes (§6.4); the numeric day count stays fixed-format (§10.1).
+    accessUntil = formatDate(end.toISOString(), {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -97,18 +104,19 @@ export function PaymentMethodPage() {
         // Same-tab handoff to the provider's hosted page. checkoutUrl should always be
         // present on a fresh create; guard defensively.
         if (order.checkoutUrl) window.location.assign(order.checkoutUrl);
-        else setCheckoutError('Could not start checkout. Please try again.');
+        else setCheckoutError(t('paymentMethod.checkoutFailed'));
       },
     });
   }
 
   // Backend 4xx `message` is user-safe (bad amount, renewal-gate copy, …); fall back otherwise.
+  // The backend prose is English-only (§6.5) — shown verbatim for known 4xx, generic key otherwise.
   const errorMessage =
     checkoutError ??
     (createOrder.isError
       ? createOrder.error instanceof ApiError
         ? createOrder.error.message
-        : 'Something went wrong. Please try again.'
+        : t('paymentMethod.genericError')
       : null);
 
   const paying = createOrder.isPending;
@@ -123,7 +131,7 @@ export function PaymentMethodPage() {
           className="mb-[14px] self-start font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim
                      no-underline transition-colors hover:text-text-secondary"
         >
-          ← Billing · Plans
+          ← {t('nav.plansBreadcrumb')}
         </Link>
 
         <div className="grid grid-cols-[1.4fr_1fr] items-start gap-25">
@@ -131,16 +139,15 @@ export function PaymentMethodPage() {
           <section className="flex flex-col gap-[22px]">
             <div>
               <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
-                Billing · Payment method
+                {t('paymentMethod.eyebrow')}
               </div>
               <h1 className="m-0 max-w-[20ch] text-[38px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
-                How do you want to pay?
+                {t('paymentMethod.title')}
               </h1>
             </div>
 
             <p className="m-0 max-w-[48ch] text-[15px] leading-[1.6] text-text-muted">
-              Pick a method to complete your subscription. More providers are being added — for now
-              Multicard covers Uzbek bank cards.
+              {t('paymentMethod.subtitle')}
             </p>
 
             {/* Multicard — the one supported method, selected by default */}
@@ -156,11 +163,11 @@ export function PaymentMethodPage() {
                   <span className="text-[16px] font-medium text-text-strong">Multicard</span>
                   <span className="rounded-[4px] bg-[color-mix(in_oklab,#3edc97_18%,transparent)] px-[6px] py-[2px]
                                    font-mono text-[9px] uppercase tracking-[0.08em] text-bid">
-                    Supported
+                    {t('paymentMethod.supported')}
                   </span>
                 </div>
                 <div className="mt-[5px] text-[13px] leading-[1.5] text-text-muted">
-                  Uzbek bank cards — UZCARD &amp; HUMO. Charged in UZS. Instant activation.
+                  {t('paymentMethod.multicardDesc')}
                 </div>
               </div>
               <span className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-2 border-accent">
@@ -171,17 +178,17 @@ export function PaymentMethodPage() {
             {/* Coming soon */}
             <div className="mt-[6px] flex items-center justify-between">
               <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-                Coming soon
+                {t('paymentMethod.comingSoon')}
               </span>
               <span className="font-mono text-[11px] tracking-[0.04em] text-text-dim">
-                {SOON_METHODS.length} more on the way
+                {t('paymentMethod.moreOnTheWay', { count: SOON_METHODS.length })}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               {SOON_METHODS.map((m) => (
                 <div
-                  key={m.name}
+                  key={m.nameKey}
                   className="flex cursor-not-allowed items-center gap-3 rounded-[12px] border border-dashed border-border
                              bg-[color-mix(in_oklab,#0d1219_60%,transparent)] px-4 py-[14px] opacity-[0.62]"
                 >
@@ -189,8 +196,10 @@ export function PaymentMethodPage() {
                                    bg-input font-mono text-[13px] text-text-dim">
                     {m.glyph || '••'}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{m.name}</span>
-                  <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-text-dim">Soon</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{t(m.nameKey)}</span>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-text-dim">
+                    {t('paymentMethod.soon')}
+                  </span>
                 </div>
               ))}
             </div>
@@ -200,19 +209,19 @@ export function PaymentMethodPage() {
           <section className="sticky top-6 flex flex-col rounded-[14px] border border-border bg-surface p-[38px]">
             <div className="mb-7 flex items-center justify-between">
               <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-                Order summary
+                {t('paymentMethod.summary.title')}
               </span>
               <Link
                 to="/billing/plans"
                 className="font-mono text-[11px] uppercase tracking-[0.08em] text-accent no-underline"
               >
-                Change
+                {t('paymentMethod.summary.change')}
               </Link>
             </div>
 
             <div className="mb-1 flex items-center gap-[10px]">
-              <span className="text-[20px] font-semibold text-text-strong">{plan.name}</span>
-              {plan.badge && (
+              <span className="text-[20px] font-semibold text-text-strong">{copy.name}</span>
+              {copy.badge && (
                 <span
                   className={`whitespace-nowrap rounded-[4px] px-[7px] py-[2px] font-mono text-[9px] uppercase tracking-[0.08em] ${
                     plan.badgeStyle === 'muted'
@@ -220,7 +229,7 @@ export function PaymentMethodPage() {
                       : 'bg-[color-mix(in_oklab,#f5b84d_22%,transparent)] text-warning'
                   }`}
                 >
-                  {plan.badge}
+                  {copy.badge}
                 </span>
               )}
             </div>
@@ -228,23 +237,31 @@ export function PaymentMethodPage() {
 
             <div className="flex flex-col gap-5">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">Duration</span>
+                <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">
+                  {t('paymentMethod.summary.duration')}
+                </span>
                 <span className="font-mono text-[14px] text-text-secondary">{durationLabel}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">Access until</span>
+                <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">
+                  {t('paymentMethod.summary.accessUntil')}
+                </span>
                 <span className="font-mono text-[14px] text-bid">{accessUntil ?? '—'}</span>
               </div>
               {isPayg && (
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">Rate</span>
+                  <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">
+                    {t('paymentMethod.summary.rate')}
+                  </span>
                   <span className="font-mono text-[14px] text-text-secondary">
-                    {plan.price} {plan.unit}
+                    {plan.price} {copy.unit}
                   </span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">Method</span>
+                <span className="font-mono text-[12px] tracking-[0.04em] text-text-muted">
+                  {t('paymentMethod.summary.method')}
+                </span>
                 <span className="font-mono text-[14px] text-text-secondary">Multicard</span>
               </div>
             </div>
@@ -253,7 +270,7 @@ export function PaymentMethodPage() {
 
             <div className="flex items-baseline justify-between">
               <span className="font-mono text-[12px] uppercase tracking-[0.08em] text-text-muted">
-                You pay
+                {t('paymentMethod.summary.youPay')}
               </span>
               <span className="flex items-baseline gap-[6px]">
                 <span className="font-mono text-[28px] font-semibold tracking-[-0.01em] text-text">
@@ -264,8 +281,7 @@ export function PaymentMethodPage() {
             </div>
 
             <div className="mt-6 text-[12px] leading-[1.5] text-text-dim">
-              You will be redirected to Multicard to complete payment securely. No auto-renewal —
-              access ends when your subscription runs out.
+              {t('paymentMethod.summary.note')}
             </div>
           </section>
         </div>
@@ -279,7 +295,7 @@ export function PaymentMethodPage() {
               className="whitespace-nowrap rounded-[4px] bg-[color-mix(in_oklab,#f5b84d_22%,transparent)] px-[7px] py-[3px]
                          font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-warning"
             >
-              Error
+              {t('paymentMethod.errorBadge')}
             </span>
             <span className="text-[14px] text-text-secondary">{errorMessage}</span>
           </div>
@@ -297,7 +313,7 @@ export function PaymentMethodPage() {
             {totalFmt} {CURRENCY}
           </span>
           <span className="text-text-dim">·</span>
-          <span className="font-mono text-[15px] text-text-secondary">{plan.name}</span>
+          <span className="font-mono text-[15px] text-text-secondary">{copy.name}</span>
         </div>
         <div className="flex items-center gap-4">
           <Link
@@ -305,7 +321,7 @@ export function PaymentMethodPage() {
             className="font-mono text-[12px] uppercase tracking-[0.08em] text-text-dim no-underline
                        transition-colors hover:text-text-secondary"
           >
-            Cancel
+            {t('paymentMethod.cancel')}
           </Link>
           <button
             type="button"
@@ -315,7 +331,7 @@ export function PaymentMethodPage() {
                        text-accent-ink transition-[filter] duration-150 hover:brightness-110
                        disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100"
           >
-            {paying ? 'Redirecting…' : 'Pay with Multicard →'}
+            {paying ? t('paymentMethod.redirecting') : t('paymentMethod.pay')}
           </button>
         </div>
       </div>
@@ -328,23 +344,26 @@ export function PaymentMethodPage() {
  * sells) — mirrors CheckoutStubPage's "no plan selected" fallback with a link back to pricing.
  */
 function UnknownPlanState() {
+  const { t } = useTranslation('billing');
   return (
     <div className="flex min-h-screen flex-col bg-bg font-sans text-text-secondary">
       <BillingHeader />
       <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col items-start px-10 pt-24">
         <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
-          Billing · Payment method
+          {t('paymentMethod.unknownPlan.eyebrow')}
         </div>
-        <h1 className="m-0 text-[28px] font-semibold tracking-[-0.01em] text-text">No plan selected</h1>
+        <h1 className="m-0 text-[28px] font-semibold tracking-[-0.01em] text-text">
+          {t('paymentMethod.unknownPlan.title')}
+        </h1>
         <p className="mt-4 text-[15px] leading-[1.6] text-text-muted">
-          We couldn't find the plan you were paying for. Head back to choose one.
+          {t('paymentMethod.unknownPlan.body')}
         </p>
         <Link
           to="/billing/plans"
           className="mt-8 rounded-[8px] border border-accent bg-transparent px-[16px] py-[12px] text-[15px]
                      font-medium text-accent no-underline transition-colors duration-150 hover:bg-accent/10"
         >
-          Back to plans
+          {t('paymentMethod.unknownPlan.back')}
         </Link>
       </main>
     </div>

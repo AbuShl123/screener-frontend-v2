@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { ApiError } from '@/lib/api';
+import { useValidationError } from '@/lib/i18n';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
@@ -20,10 +22,12 @@ import { loginFormSchema, type LoginFormValues } from '../validation';
  *        amber "Resend verification email" button (reuses useResendVerification +
  *        useCooldown). Fields NOT tinted — the password already checked out.
  *   3c — 401 "Account disabled": red banner with an inert support link. Not tinted.
- * Anything unexpected (stray 400/5xx) falls back to a red banner showing the raw
- * (user-safe) server message rather than mislabeling it as a known state.
+ * Anything unexpected (stray 400/5xx) falls back to a generic translated banner — never
+ * the raw (English-only) server message, so RU mode stays localized (i18n plan §6.5).
  */
 export function LoginPage() {
+  const { t } = useTranslation(['auth', 'common']);
+  const fieldError = useValidationError();
   const navigate = useNavigate();
   const loginMut = useLogin();
   const resendMut = useResendVerification();
@@ -66,27 +70,31 @@ export function LoginPage() {
       {/* no `marketing` prop → SplitAuthLayout's default panel IS the 2a content */}
       <form onSubmit={handleSubmit(onValid)} noValidate className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
-          <h1 className="text-[26px] font-semibold tracking-[-0.01em] text-text">Sign in</h1>
-          <p className="text-[14px] leading-[1.55] text-text-secondary">
-            Welcome back. Your books are still running.
-          </p>
+          <h1 className="text-[26px] font-semibold tracking-[-0.01em] text-text">
+            {t('login.title')}
+          </h1>
+          <p className="text-[14px] leading-[1.55] text-text-secondary">{t('login.subtitle')}</p>
         </div>
 
-        {invalidCreds && <Banner variant="error">Invalid email or password.</Banner>}
+        {invalidCreds && <Banner variant="error">{t('login.invalidCreds')}</Banner>}
         {disabled && (
           <Banner variant="error">
-            Your account has been disabled. Contact{' '}
-            <a href="#" className="font-medium text-[#F5C0C0]">
-              support
-            </a>
-            .
+            <Trans
+              t={t}
+              i18nKey="login.disabled"
+              components={{ support: <a href="#" className="font-medium text-[#F5C0C0]" /> }}
+            />
           </Banner>
         )}
         {unverified && (
           <Banner variant="warning" className="flex flex-col gap-3">
             <p className="m-0 text-[14px] leading-[1.5]">
-              Please verify your email before logging in. We sent a link to{' '}
-              <strong className="font-medium text-[#F8E3BE]">{getValues('email')}</strong>.
+              <Trans
+                t={t}
+                i18nKey="login.unverified"
+                values={{ email: getValues('email') }}
+                components={{ strong: <strong className="font-medium text-[#F8E3BE]" /> }}
+              />
             </p>
             {/* TODO: this button might be extracted into a reusable inline Button variant
                 (e.g. warning/amber) if a second amber button ever appears — until then,
@@ -102,42 +110,42 @@ export function LoginPage() {
               }}
             >
               {resendMut.isPending
-                ? 'Sending…'
+                ? t('login.resending')
                 : cooldown.active
-                  ? `Resend in ${cooldown.remaining}s`
-                  : 'Resend verification email'}
+                  ? t('login.resendIn', { seconds: cooldown.remaining })
+                  : t('login.resend')}
             </button>
           </Banner>
         )}
-        {otherError && <Banner variant="error">{submitError!.message}</Banner>}
+        {otherError && <Banner variant="error">{t('common:errors.generic')}</Banner>}
 
         <div className="flex flex-col gap-[18px]">
           <TextField
-            label="Email"
+            label={t('login.emailLabel')}
             type="email"
-            placeholder="ada@example.com"
-            error={errors.email?.message}
+            placeholder={t('login.emailPlaceholder')}
+            error={fieldError(errors.email?.message)}
             invalid={invalidCreds}
             {...register('email')}
           />
           <TextField
-            label="Password"
+            label={t('login.passwordLabel')}
             type="password"
-            placeholder="••••••••••••"
-            error={errors.password?.message}
+            placeholder={t('login.passwordPlaceholder')}
+            error={fieldError(errors.password?.message)}
             invalid={invalidCreds}
             {...register('password')}
           />
         </div>
 
         <Button type="submit" variant="primary" disabled={loginMut.isPending}>
-          {loginMut.isPending ? 'Signing in…' : 'Sign in'}
+          {loginMut.isPending ? t('login.submitting') : t('login.submit')}
         </Button>
 
         <p className="text-center text-[14px] text-text-secondary">
-          New to Screener?{' '}
+          {t('login.signupPrompt')}{' '}
           <Link to="/register" className="font-medium text-accent no-underline">
-            Create an account
+            {t('login.signupLink')}
           </Link>
         </p>
       </form>

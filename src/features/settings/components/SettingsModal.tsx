@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
 import { NotificationsSettings } from './NotificationsSettings';
 import { ClassificationRules } from './ClassificationRules';
 
@@ -16,17 +18,18 @@ type Tab = 'notifications' | 'rules' | 'appearance';
 
 interface NavItem {
   id: Tab;
-  label: string;
+  labelKey: ParseKeys<'settings'>;
   disabled: boolean;
 }
 
 const NAV: NavItem[] = [
-  { id: 'notifications', label: 'Notifications', disabled: false },
-  { id: 'rules', label: 'Classification rules', disabled: false },
-  { id: 'appearance', label: 'Appearance', disabled: true },
+  { id: 'notifications', labelKey: 'modal.nav.notifications', disabled: false },
+  { id: 'rules', labelKey: 'modal.nav.rules', disabled: false },
+  { id: 'appearance', labelKey: 'modal.nav.appearance', disabled: true },
 ];
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation('settings');
   const [tab, setTab] = useState<Tab>('rules');
 
   // Close on Escape while open (backdrop click + header × cover the pointer cases).
@@ -65,7 +68,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Settings"
+        aria-label={t('modal.title')}
         className="flex h-[min(88vh,660px)] w-full max-w-[1040px] flex-col overflow-hidden
                    rounded-[14px] border border-border bg-surface shadow-[var(--shadow-card)]
                    [transition:transform_180ms_cubic-bezier(0.22,0.61,0.36,1)]"
@@ -73,11 +76,11 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       >
         {/* Header */}
         <div className="flex flex-none items-center justify-between gap-3 border-b border-border px-5 py-[17px]">
-          <span className="text-[16px] font-semibold text-text">Settings</span>
+          <span className="text-[16px] font-semibold text-text">{t('modal.title')}</span>
           <button
             type="button"
             onClick={onClose}
-            title="Close"
+            title={t('modal.close')}
             className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg border
                        border-border-input text-[16px] leading-none text-text-secondary transition-colors
                        hover:bg-white/5 hover:text-text-strong"
@@ -113,11 +116,11 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                         active ? 'bg-accent' : 'border border-border-input'
                       }`}
                     />
-                    {item.label}
+                    {t(item.labelKey)}
                   </span>
                   {item.disabled && (
                     <span className="rounded border border-border-input px-1 py-px font-mono text-[8px] tracking-[0.12em] text-text-dim">
-                      SOON
+                      {t('modal.soon')}
                     </span>
                   )}
                 </button>

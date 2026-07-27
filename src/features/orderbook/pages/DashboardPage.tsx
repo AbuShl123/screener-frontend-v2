@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import { DashboardHeader } from '@/features/orderbook/components/DashboardHeader';
 import { OrderbookCard } from '@/features/orderbook/components/OrderbookCard';
@@ -26,6 +27,7 @@ export type SizeMode = 'usd' | 'qty';
 export function DashboardPage() {
   useOrderbookFeed();
 
+  const { t } = useTranslation('orderbook');
   const [sizeMode, setSizeMode] = useState<SizeMode>('usd');
   const [sortMode, setSortMode] = useState<SortMode>('importance');
   // Owned here because TWO things depend on it: the handle's visibility and `<main>`'s
@@ -60,7 +62,7 @@ export function DashboardPage() {
       {/* Thin notice so a dead/stalled backend isn't silent (plan §7.1). */}
       {status === 'reconnecting' && (
         <div className="border-b border-border-subtle bg-input px-8 py-2 text-center text-[12px] text-text-muted">
-          Reconnecting to the feed…
+          {t('dashboard.reconnecting')}
         </div>
       )}
 
@@ -91,14 +93,15 @@ export function DashboardPage() {
 
 /** Centered muted panel shown until the first book arrives (plan §7.1). */
 function EmptyState({ status }: { status: ReturnType<typeof useOrderbookStore.getState>['status'] }) {
+  const { t } = useTranslation('orderbook');
   const message =
     status === 'auth-failed'
-      ? 'Feed unavailable — your session could not be authorized.'
+      ? t('dashboard.empty.authFailed')
       : status === 'access-denied'
-        ? 'Feed unavailable — an active subscription is required.'
+        ? t('dashboard.empty.accessDenied')
         : status === 'connected'
-          ? 'Waiting for order books…'
-          : 'Connecting…';
+          ? t('dashboard.empty.waiting')
+          : t('dashboard.empty.connecting');
 
   return (
     <div className="flex min-h-[50vh] items-center justify-center">

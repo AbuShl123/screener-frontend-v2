@@ -71,18 +71,33 @@ export function fmtClock(ms: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+/** Unit suffixes for `fmtAge` — day/hour/minute/second, in that order. */
+export interface AgeUnits {
+  d: string;
+  h: string;
+  m: string;
+  s: string;
+}
+
+/** English single-letter suffixes — the template default when no locale is supplied. */
+const DEFAULT_AGE_UNITS: AgeUnits = { d: 'd', h: 'h', m: 'm', s: 's' };
+
 /**
  * Order age from a duration in ms — largest two units, e.g. `3d 4h` / `22h 15m` /
  * `9m` / `42s` (template's rule). Used for the native `title` tooltip; a negative or
  * sub-second delta clamps to `1s`.
+ *
+ * Stays pure and i18n-free: the unit suffixes are passed in (defaulting to English),
+ * so the caller — which already runs only off the hot path, on hover — supplies
+ * localized suffixes without this formatter ever touching the i18n instance.
  */
-export function fmtAge(ms: number): string {
+export function fmtAge(ms: number, units: AgeUnits = DEFAULT_AGE_UNITS): string {
   const s = Math.max(1, Math.floor(ms / 1000));
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (d) return d + 'd ' + h + 'h';
-  if (h) return h + 'h ' + m + 'm';
-  if (m) return m + 'm';
-  return s + 's';
+  if (d) return d + units.d + ' ' + h + units.h;
+  if (h) return h + units.h + ' ' + m + units.m;
+  if (m) return m + units.m;
+  return s + units.s;
 }

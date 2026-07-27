@@ -1,13 +1,19 @@
+import type { ParseKeys } from 'i18next';
 import type { BookKey, Market, OrderBook } from '@/features/orderbook/types';
 
 export type SortMode = 'importance' | 'alphabetical' | 'spot-first' | 'futures-first';
 
-/** Dropdown option list, in display order (design template "Dashboard Page — Final"). */
-export const SORT_OPTIONS: { id: SortMode; label: string }[] = [
-  { id: 'importance', label: 'Importance level' },
-  { id: 'alphabetical', label: 'Alphabetical' },
-  { id: 'spot-first', label: 'Spot first, then futures' },
-  { id: 'futures-first', label: 'Futures first, then spot' },
+/**
+ * Dropdown option list, in display order (design template "Dashboard Page — Final").
+ * Each option carries a stable `orderbook` namespace KEY (not English prose), resolved
+ * with `t()` in `SortMenu` at render — same labelKey pattern as landing's `constants.ts`
+ * and settings' `SettingsModal` NAV. `ParseKeys<'orderbook'>` makes a typo a compile error.
+ */
+export const SORT_OPTIONS: { id: SortMode; labelKey: ParseKeys<'orderbook'> }[] = [
+  { id: 'importance', labelKey: 'sort.options.importance' },
+  { id: 'alphabetical', labelKey: 'sort.options.alphabetical' },
+  { id: 'spot-first', labelKey: 'sort.options.spotFirst' },
+  { id: 'futures-first', labelKey: 'sort.options.futuresFirst' },
 ];
 
 /** Pulls `MARKET` back out of a `bookKey` (`SYMBOL:MARKET`) without touching `books`. */

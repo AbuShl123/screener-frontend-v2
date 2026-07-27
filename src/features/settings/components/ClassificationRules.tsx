@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fmtSymbol, marketBadge } from '@/features/orderbook/format';
 import { bookKey } from '@/features/orderbook/types';
 import { useCustomRules, useDefaultRule, useTickers } from '../queries';
@@ -24,6 +25,7 @@ import { UpgradeNote, isSubscriptionError } from './UpgradeNote';
 type Source = 'CUSTOM' | 'HIGH_LIQ' | 'DEFAULT';
 
 export function ClassificationRules({ open }: { open: boolean }) {
+  const { t } = useTranslation('settings');
   const defaultQuery = useDefaultRule(open);
   const customQuery = useCustomRules(open);
   const tickersQuery = useTickers(open);
@@ -76,11 +78,11 @@ export function ClassificationRules({ open }: { open: boolean }) {
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <span className="flex items-center gap-[7px]">
-              <h3 className="mb-[5px] text-[14px] font-semibold text-text">Per-ticker thresholds</h3>
+              <h3 className="mb-[5px] text-[14px] font-semibold text-text">{t('rules.heading')}</h3>
               <button
                 type="button"
                 onClick={() => setInfoOpen((v) => !v)}
-                title="What does this mean?"
+                title={t('rules.infoTitle')}
                 className="mb-[5px] inline-flex h-[18px] w-[18px] flex-none items-center justify-center
                            rounded-full border border-text-strong font-mono text-[12px] font-bold leading-none
                            text-text-strong transition-colors hover:bg-white/[0.06]"
@@ -90,15 +92,13 @@ export function ClassificationRules({ open }: { open: boolean }) {
             </span>
             {infoOpen && (
               <p className="max-w-[62ch] text-[13px] leading-[1.55] text-text-secondary">
-                Each tier pairs a minimum notional with a maximum distance from mid-price. A custom
-                rule replaces the default entirely for one ticker + market — all four tiers, every
-                time.
+                {t('rules.info')}
               </p>
             )}
           </div>
           <span className="shrink-0 rounded-md border border-accent/45 bg-accent/[0.12] px-2 py-[3px]
                            font-mono text-[10px] tracking-[0.1em] whitespace-nowrap text-accent">
-            {customRules.length} CUSTOM
+            {t('rules.count', { n: customRules.length })}
           </span>
         </div>
 
@@ -122,7 +122,7 @@ export function ClassificationRules({ open }: { open: boolean }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tickers to edit rules…"
+            placeholder={t('rules.searchPlaceholder')}
             className="box-border w-full rounded-lg border border-border-input bg-input py-[11px]
                        pr-3 pl-9 font-mono text-[12px] tracking-[0.02em] text-text outline-none
                        focus:border-accent"
@@ -131,10 +131,14 @@ export function ClassificationRules({ open }: { open: boolean }) {
 
         {/* Loading / error hints — the input stays usable; results appear when data lands. */}
         {tickersQuery.isLoading && (
-          <p className="font-mono text-[11px] tracking-[0.03em] text-text-dim">Loading tickers…</p>
+          <p className="font-mono text-[11px] tracking-[0.03em] text-text-dim">
+            {t('rules.loading')}
+          </p>
         )}
         {tickersQuery.isError && (
-          <p className="font-mono text-[11px] tracking-[0.03em] text-danger">Couldn't load tickers</p>
+          <p className="font-mono text-[11px] tracking-[0.03em] text-danger">
+            {t('rules.loadError')}
+          </p>
         )}
 
         {/* Search results */}
@@ -164,17 +168,17 @@ export function ClassificationRules({ open }: { open: boolean }) {
                       {isCustom && (
                         <span className="rounded border border-accent/45 bg-accent/[0.12] px-[5px] py-px
                                          font-mono text-[9px] tracking-[0.08em] text-accent">
-                          CUSTOM
+                          {t('rules.custom')}
                         </span>
                       )}
                     </span>
-                    <span className="shrink-0 text-[12px] text-accent">Edit rules ›</span>
+                    <span className="shrink-0 text-[12px] text-accent">{t('rules.editRules')}</span>
                   </button>
                 );
               })
             ) : (
               <div className="px-[13px] py-5 text-center font-mono text-[12px] tracking-[0.03em] text-text-dim">
-                No tickers match “{query.trim()}”
+                {t('rules.noMatch', { query: query.trim() })}
               </div>
             )}
           </div>
@@ -193,7 +197,9 @@ export function ClassificationRules({ open }: { open: boolean }) {
             onClose={() => setSelected(null)}
           />
         ) : (
-          <p className="font-mono text-[11px] tracking-[0.03em] text-text-dim">Loading defaults…</p>
+          <p className="font-mono text-[11px] tracking-[0.03em] text-text-dim">
+            {t('rules.loadingDefaults')}
+          </p>
         ))}
 
       <div className="h-px shrink-0 bg-border-subtle" />
@@ -201,9 +207,11 @@ export function ClassificationRules({ open }: { open: boolean }) {
       {/* Your custom rules */}
       <section className="flex flex-col gap-[15px]">
         <div>
-          <h3 className="mb-[5px] text-[14px] font-semibold text-text">Your custom rules</h3>
+          <h3 className="mb-[5px] text-[14px] font-semibold text-text">
+            {t('rules.yourRules.heading')}
+          </h3>
           <p className="max-w-[62ch] text-[13px] leading-[1.55] text-text-secondary">
-            Tickers overriding the defaults. Every other ticker follows the default rule.
+            {t('rules.yourRules.desc')}
           </p>
         </div>
         {listGated ? (

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/lib/api';
 
@@ -14,20 +15,21 @@ export function isSubscriptionError(err: unknown): boolean {
 
 /** Inline upgrade CTA — stands in for the custom list / sits under the editor on a subscription 403. */
 export function UpgradeNote({ className = '' }: { className?: string }) {
+  const { t } = useTranslation('settings');
   return (
     <div
       className={`flex flex-wrap items-center justify-between gap-2 rounded-[10px] border
                   border-border-subtle bg-input px-[13px] py-3 ${className}`}
     >
       <span className="font-mono text-[12px] tracking-[0.03em] text-text-secondary">
-        Active subscription required
+        {t('upgrade.required')}
       </span>
       <Link
         to="/billing/plans"
         className="shrink-0 rounded-lg border border-accent/45 px-3.5 py-1.5 text-[12px] text-accent
                    transition-colors hover:bg-accent/10"
       >
-        Upgrade →
+        {t('upgrade.cta')}
       </Link>
     </div>
   );

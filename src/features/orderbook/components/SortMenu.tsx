@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SORT_OPTIONS, type SortMode } from '@/features/orderbook/sortOrderbooks';
 
 interface SortMenuProps {
@@ -12,8 +13,10 @@ interface SortMenuProps {
  * it on outside click, matching `SettingsModal`'s backdrop-click-to-close convention.
  */
 export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
+  const { t } = useTranslation('orderbook');
   const [open, setOpen] = useState(false);
-  const activeLabel = SORT_OPTIONS.find((o) => o.id === sortMode)?.label ?? SORT_OPTIONS[0].label;
+  const activeLabelKey =
+    SORT_OPTIONS.find((o) => o.id === sortMode)?.labelKey ?? SORT_OPTIONS[0].labelKey;
 
   useEffect(() => {
     if (!open) return;
@@ -34,8 +37,8 @@ export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
                       open ? 'bg-white/5 text-text-strong' : 'bg-transparent text-text-secondary hover:bg-white/5 hover:text-text-strong'
                     }`}
       >
-        <span className="text-text-dim">Sort</span>
-        <span className="text-text-strong">{activeLabel}</span>
+        <span className="text-text-dim">{t('sort.label')}</span>
+        <span className="text-text-strong">{t(activeLabelKey)}</span>
         <svg
           width="12"
           height="12"
@@ -73,7 +76,7 @@ export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
                                 active ? 'bg-accent/[0.12] text-text-strong' : 'bg-transparent text-text-secondary'
                               }`}
                 >
-                  <span>{opt.label}</span>
+                  <span>{t(opt.labelKey)}</span>
                   {active && <span className="text-[13px] leading-none text-accent">✓</span>}
                 </button>
               );

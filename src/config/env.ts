@@ -12,6 +12,8 @@ import { z } from 'zod';
 const schema = z.object({
   VITE_API_BASE_URL: z.string().default(''),
   VITE_WS_BASE_URL: z.string().default(''),
+  /** Default/fallback UI locale. The *detected* locale is the detector's job (see lib/i18n). */
+  VITE_DEFAULT_LOCALE: z.enum(['en', 'ru']).default('en'),
 });
 
 const parsed = schema.safeParse(import.meta.env);
@@ -45,6 +47,8 @@ export const config = {
   apiBaseUrl: raw.VITE_API_BASE_URL.replace(/\/$/, ''),
   /** WebSocket base URL, e.g. wss://tc-screener.com or ws://localhost:5173. */
   wsBaseUrl: deriveWsBaseUrl(raw.VITE_API_BASE_URL, raw.VITE_WS_BASE_URL),
+  /** Fallback/default UI locale — i18next's `fallbackLng` and the detector's final floor. */
+  defaultLocale: raw.VITE_DEFAULT_LOCALE,
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
 } as const;

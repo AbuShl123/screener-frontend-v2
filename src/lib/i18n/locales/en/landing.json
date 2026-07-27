@@ -1,0 +1,75 @@
+{
+  "header": {
+    "pricing": "Pricing",
+    "features": "Features",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "goDashboard": "Go to dashboard"
+  },
+  "hero": {
+    "eyebrow": "Real-time market intelligence",
+    "title": "Every level that matters, in real time.",
+    "lead": "Screener maintains live order books for <mono>500+</mono> spot and futures tickers across <mono>20+</mono> crypto exchanges, classifies every price level against your own thresholds, and streams the result to you in under a second.",
+    "startTrial": "Start {{days}}-day free trial",
+    "goDashboard": "Go to dashboard",
+    "seePricing": "See pricing",
+    "noCard": "free on first registration · no card needed",
+    "stats": {
+      "tickers": "Tickers · spot & futures",
+      "exchanges": "Exchanges covered",
+      "latency": "Streaming latency",
+      "updates": "Book updates processed"
+    }
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "One product. Four ways to pay.",
+    "subtitle": "Every plan includes the full product. The only difference is duration and price.",
+    "trialBadge": "{{days}} DAYS FREE",
+    "trialNote": "Your first registration comes with a <strong>{{days}}-day free trial</strong> — full access, no card needed.",
+    "footnote": "all plans · 500+ tickers · custom rules · charts · oi alerts · voice notifications",
+    "startNow": "Start now"
+  },
+  "features": {
+    "eyebrow": "What you get",
+    "title": "Your thresholds. Your tickers. Sub-second.",
+    "subtitle": "A high-throughput engine watches the market so you don't have to — and tells you, out loud, when something matters.",
+    "items": {
+      "liveBooks": {
+        "label": "Live order books",
+        "body": "Real-time local books for 500+ spot and futures tickers across 20+ exchanges, streamed over WebSockets in under a second."
+      },
+      "rules": {
+        "label": "Rules you define",
+        "body": "Set custom classification thresholds per ticker. Levels are ranked by proximity to the spread and notional value — significance on your terms, not ours."
+      },
+      "charts": {
+        "label": "Charts",
+        "body": "Volume-change charts for every ticker on every exchange, plus candlestick data — see where activity is building before the move."
+      },
+      "oiAlerts": {
+        "label": "Open interest alerts",
+        "body": "When a ticker's open interest grows unusually large, you're notified the moment it happens — not an hour later."
+      },
+      "voice": {
+        "label": "Voice notifications",
+        "body": "Alerts are read out loud with text-to-speech. Watch the market without watching the screen."
+      },
+      "volume": {
+        "label": "Built for volume",
+        "body": "Engineered for hundreds of thousands of book updates per second. No queues, no sampling, no lag — the number you see is the market now."
+      }
+    }
+  },
+  "cta": {
+    "eyebrow": "Get started",
+    "title": "Start with {{days}} days free.",
+    "subtitle": "No card needed. Full access from the first minute.",
+    "createAccount": "Create account",
+    "signIn": "Sign in",
+    "goDashboard": "Go to dashboard"
+  },
+  "footer": {
+    "copyright": "© 2026 screener · real-time market data · 20+ exchanges"
+  }
+}

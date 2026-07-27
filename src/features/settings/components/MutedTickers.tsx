@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fmtSymbol, marketBadge } from '@/features/orderbook/format';
 import { type Market } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '../notificationSettingsStore';
@@ -15,6 +16,7 @@ import { buildTickerPool } from '../tickerPool';
  * fetch degrades gracefully — existing mutes still render and can be removed.
  */
 export function MutedTickers({ open }: { open: boolean }) {
+  const { t } = useTranslation('settings');
   const muted = useNotificationSettingsStore((s) => s.muted);
   const mute = useNotificationSettingsStore((s) => s.mute);
   const unmute = useNotificationSettingsStore((s) => s.unmute);
@@ -35,14 +37,15 @@ export function MutedTickers({ open }: { open: boolean }) {
     <section className="flex flex-col gap-[15px]">
       <div className="flex items-baseline justify-between gap-3">
         <div>
-          <h3 className="mb-[5px] text-[14px] font-semibold text-text">Muted tickers</h3>
+          <h3 className="mb-[5px] text-[14px] font-semibold text-text">
+            {t('notifications.muted.heading')}
+          </h3>
           <p className="max-w-[54ch] text-[13px] leading-[1.55] text-text-secondary">
-            Muted ticker + market books never trigger notifications. Search across all tickers to
-            mute one.
+            {t('notifications.muted.desc')}
           </p>
         </div>
         <span className="shrink-0 font-mono text-[10px] tracking-[0.1em] whitespace-nowrap text-text-muted">
-          {muted.length} MUTED
+          {t('notifications.muted.count', { n: muted.length })}
         </span>
       </div>
 
@@ -66,7 +69,7 @@ export function MutedTickers({ open }: { open: boolean }) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tickers to mute…"
+          placeholder={t('notifications.muted.searchPlaceholder')}
           className="box-border w-full rounded-lg border border-border-input bg-input py-[11px]
                      pr-3 pl-9 font-mono text-[12px] tracking-[0.02em] text-text outline-none
                      focus:border-accent"
@@ -75,10 +78,14 @@ export function MutedTickers({ open }: { open: boolean }) {
 
       {/* Loading / error hints — the input stays usable; results appear when data lands. */}
       {tickersQuery.isLoading && (
-        <p className="font-mono text-[11px] tracking-[0.03em] text-text-dim">Loading tickers…</p>
+        <p className="font-mono text-[11px] tracking-[0.03em] text-text-dim">
+          {t('notifications.muted.loading')}
+        </p>
       )}
       {tickersQuery.isError && (
-        <p className="font-mono text-[11px] tracking-[0.03em] text-danger">Couldn't load tickers</p>
+        <p className="font-mono text-[11px] tracking-[0.03em] text-danger">
+          {t('notifications.muted.loadError')}
+        </p>
       )}
 
       {/* Search results */}
@@ -109,14 +116,14 @@ export function MutedTickers({ open }: { open: boolean }) {
                     className="shrink-0 rounded-lg border border-accent/45 px-3.5 py-1.5 text-[12px]
                                text-accent transition-colors hover:bg-accent/10"
                   >
-                    Mute
+                    {t('notifications.muted.mute')}
                   </button>
                 </div>
               );
             })
           ) : (
             <div className="px-[13px] py-5 text-center font-mono text-[12px] tracking-[0.03em] text-text-dim">
-              No tickers match “{query.trim()}”
+              {t('notifications.muted.noMatch', { query: query.trim() })}
             </div>
           )}
         </div>
@@ -145,7 +152,7 @@ export function MutedTickers({ open }: { open: boolean }) {
                 <button
                   type="button"
                   onClick={() => unmute(key)}
-                  title="Unmute"
+                  title={t('notifications.muted.unmute')}
                   className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full
                              bg-white/[0.06] text-[13px] leading-none text-text-muted transition-colors
                              hover:bg-danger/20 hover:text-danger"
@@ -159,7 +166,7 @@ export function MutedTickers({ open }: { open: boolean }) {
       ) : (
         <div className="rounded-[10px] border border-dashed border-border-subtle px-[13px] py-4
                         text-center font-mono text-[12px] tracking-[0.03em] text-text-dim">
-          No muted tickers — every book can notify
+          {t('notifications.muted.empty')}
         </div>
       )}
     </section>

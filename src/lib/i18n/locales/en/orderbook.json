@@ -1,0 +1,63 @@
+{
+  "header": {
+    "watchlist": "Watchlist",
+    "tickers": "{{n}} TICKERS",
+    "size": {
+      "qty": "QTY",
+      "usd": "$ USD"
+    },
+    "settings": "Settings",
+    "account": "Account",
+    "logout": "Log out",
+    "loggingOut": "Signing out…"
+  },
+  "sort": {
+    "label": "Sort",
+    "options": {
+      "importance": "Importance level",
+      "alphabetical": "Alphabetical",
+      "spotFirst": "Spot first, then futures",
+      "futuresFirst": "Futures first, then spot"
+    }
+  },
+  "card": {
+    "firstSeen": "First seen {{age}} ago",
+    "age": {
+      "d": "d",
+      "h": "h",
+      "m": "m",
+      "s": "s"
+    }
+  },
+  "notification": {
+    "side": {
+      "bid": "BID",
+      "ask": "ASK"
+    },
+    "metric": {
+      "price": "PRICE",
+      "notional": "NOTIONAL",
+      "size": "SIZE",
+      "dist": "DIST"
+    }
+  },
+  "panel": {
+    "title": "Notifications",
+    "new": "{{n}} NEW",
+    "clearAll": "Clear all notifications",
+    "collapse": "Collapse",
+    "collapseAria": "Collapse notifications",
+    "open": "Open notifications",
+    "searchPlaceholder": "Search ticker, price, size…",
+    "empty": "No matching notifications"
+  },
+  "dashboard": {
+    "reconnecting": "Reconnecting to the feed…",
+    "empty": {
+      "authFailed": "Feed unavailable — your session could not be authorized.",
+      "accessDenied": "Feed unavailable — an active subscription is required.",
+      "waiting": "Waiting for order books…",
+      "connecting": "Connecting…"
+    }
+  }
+}

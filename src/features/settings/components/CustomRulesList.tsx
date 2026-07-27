@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { fmtMoney, fmtSymbol, marketBadge } from '@/features/orderbook/format';
 import { useDeleteRule } from '../queries';
 import type { CustomRule, RuleTarget } from '../schemas';
@@ -27,13 +28,14 @@ export function CustomRulesList({
   rules: CustomRule[];
   onSelect: (target: RuleTarget) => void;
 }) {
+  const { t } = useTranslation('settings');
   const deleteRule = useDeleteRule();
 
   if (rules.length === 0) {
     return (
       <div className="rounded-[10px] border border-dashed border-border-subtle px-[13px] py-4
                       text-center font-mono text-[12px] tracking-[0.03em] text-text-dim">
-        No custom rules — all tickers follow the defaults
+        {t('rules.yourRules.empty')}
       </div>
     );
   }
@@ -69,7 +71,7 @@ export function CustomRulesList({
               className="shrink-0 rounded-lg border border-accent/45 px-3.5 py-1.5 text-[12px] text-accent
                          transition-colors hover:bg-accent/10"
             >
-              Edit
+              {t('rules.list.edit')}
             </button>
             <button
               type="button"
@@ -78,7 +80,7 @@ export function CustomRulesList({
               className="shrink-0 rounded-lg border border-danger/45 px-3.5 py-1.5 text-[12px] text-danger
                          transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {reverting ? 'Reverting…' : 'Revert'}
+              {reverting ? t('rules.list.reverting') : t('rules.list.revert')}
             </button>
           </div>
         );

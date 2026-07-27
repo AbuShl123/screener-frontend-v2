@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Banner } from '@/components/Banner';
+import { formatDate } from '@/lib/i18n';
 import { useMe } from '@/features/auth';
 import { BillingHeader } from '../components/BillingHeader';
 import { buildPlanViews } from '../catalog';
 import { usePlans } from '../queries';
 import { usePaymentStatus } from '../usePaymentStatus';
 
-const groupFmt = new Intl.NumberFormat('en-US');
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-const fmtDate = (iso: string) => dateFmt.format(new Date(iso));
+const groupFmt = new Intl.NumberFormat('en-US'); // fixed-format numbers, never localized (§10.1)
+// Date localizes (§6.4); "11 Jul 2026" (en) / "11 июл. 2026 г." (ru).
+const fmtDate = (iso: string) => formatDate(iso, { day: '2-digit', month: 'short', year: 'numeric' });
 
 /**
  * Payment Status (`/billing/status`, behind ProtectedRoute) — the Multicard `return_url`
@@ -23,6 +25,7 @@ const fmtDate = (iso: string) => dateFmt.format(new Date(iso));
  * the resolved view model + live order/profile data onto the design's centered column.
  */
 export function PaymentStatusPage() {
+  const { t } = useTranslation('billing');
   const status = usePaymentStatus();
   const me = useMe();
   const { data: plansData } = usePlans();
@@ -32,20 +35,29 @@ export function PaymentStatusPage() {
 
   // Order-derived labels (graceful `—` while the first poll is still in flight during
   // `confirming`, when the well shows placeholders).
-  const planName = order
-    ? (buildPlanViews(plansData).find((p) => p.code === order.planCode)?.name ?? order.planCode)
-    : '—';
+  const planView = order ? buildPlanViews(plansData).find((p) => p.code === order.planCode) : undefined;
+  const planName = planView ? t(planView.nameKey) : (order?.planCode ?? '—');
   const amountLabel = order ? `${groupFmt.format(order.amount)} ${order.currency}` : '—';
   const reference = order?.orderId ?? '—';
   const durationDays = order ? Math.round(order.accessDurationSeconds / 86400) : null;
-  const durationLabel = durationDays != null ? `${durationDays} ${durationDays === 1 ? 'day' : 'days'}` : '—';
+  const durationLabel =
+    durationDays != null ? t('plans.dayCount', { count: durationDays }) : '—';
   const accessUntil = me.data?.accessExpiresAt ? fmtDate(me.data.accessExpiresAt) : null;
-  const email = me.data?.email ?? 'your email';
+  const email = me.data?.email ?? t('paymentStatus.yourEmail');
 
   const rowSecondary = 'text-text-secondary';
   const rowStrong = 'text-text-strong';
   const rowMuted = 'text-text-muted';
   const rowBid = 'text-bid';
+
+  // Row labels are shared across states (§6.2).
+  const rk = {
+    plan: t('paymentStatus.rows.plan'),
+    paid: t('paymentStatus.rows.paid'),
+    amount: t('paymentStatus.rows.amount'),
+    accessUntil: t('paymentStatus.rows.accessUntil'),
+    reference: t('paymentStatus.rows.reference'),
+  };
 
   // Which content to render: the confirming screen until a resolution is revealed past the floor.
   const key = status.phase === 'result' && status.resolution ? status.resolution.kind : 'confirming';
@@ -55,143 +67,155 @@ export function PaymentStatusPage() {
       case 'success':
         return {
           marker: <Ring tone="bid" glyph="✓" />,
-          eyebrow: 'Payment confirmed',
+          eyebrow: t('paymentStatus.success.eyebrow'),
           eyebrowCls: 'text-bid',
-          title: accessUntil ? `You're all in until ${accessUntil}` : "You're all in",
-          subtitle:
-            'Full terminal access is live on your account — real-time books, custom rules and alerts across every supported ticker.',
+          title: accessUntil
+            ? t('paymentStatus.success.titleUntil', { date: accessUntil })
+            : t('paymentStatus.success.title'),
+          subtitle: t('paymentStatus.success.subtitle'),
           showWell: true,
-          wellLabel: 'Receipt',
-          pillLabel: 'Paid',
+          wellLabel: t('paymentStatus.success.wellLabel'),
+          pillLabel: t('paymentStatus.success.pill'),
           pillCls: 'bg-bid/15 text-bid',
           rows: [
-            { k: 'Plan', v: `${planName} · ${durationLabel}`, cls: rowSecondary },
-            { k: 'Paid', v: amountLabel, cls: rowStrong },
-            { k: 'Access until', v: accessUntil ?? '—', cls: rowBid },
-            { k: 'Reference', v: reference, cls: rowMuted },
+            {
+              k: rk.plan,
+              v: t('paymentStatus.success.planValue', { plan: planName, duration: durationLabel }),
+              cls: rowSecondary,
+            },
+            { k: rk.paid, v: amountLabel, cls: rowStrong },
+            { k: rk.accessUntil, v: accessUntil ?? '—', cls: rowBid },
+            { k: rk.reference, v: reference, cls: rowMuted },
           ],
-          primary: { label: 'Open terminal →', onClick: () => navigate('/dashboard') },
-          secondary: { label: 'View billing history', onClick: () => navigate('/account/billing-history') },
-          footNote: `A receipt has been emailed to ${email}. No auto-renewal — access simply ends when your subscription runs out.`,
+          primary: { label: t('paymentStatus.success.primary'), onClick: () => navigate('/dashboard') },
+          secondary: {
+            label: t('paymentStatus.success.secondary'),
+            onClick: () => navigate('/account/billing-history'),
+          },
+          footNote: t('paymentStatus.success.footNote', { email }),
           showProgress: false,
         };
 
       case 'timeout':
         return {
           marker: <Ring tone="warning" glyph="!" />,
-          eyebrow: 'Payment not completed',
+          eyebrow: t('paymentStatus.timeout.eyebrow'),
           eyebrowCls: 'text-warning',
-          title: 'Payment not completed',
-          subtitle:
-            "We didn't receive a confirmation from Multicard in time. Your plan hasn't been activated and you have not been charged.",
+          title: t('paymentStatus.timeout.title'),
+          subtitle: t('paymentStatus.timeout.subtitle'),
           banner: {
             variant: 'warning',
-            text: "We couldn't confirm this payment within 90 seconds. If your card was charged it will be reversed automatically — nothing was activated.",
+            text: t('paymentStatus.timeout.banner'),
           },
           showWell: true,
-          wellLabel: 'Attempted order',
-          pillLabel: 'Not confirmed',
+          wellLabel: t('paymentStatus.timeout.wellLabel'),
+          pillLabel: t('paymentStatus.timeout.pill'),
           pillCls: 'bg-danger/15 text-danger',
           rows: [
-            { k: 'Plan', v: planName, cls: rowSecondary },
-            { k: 'Amount', v: amountLabel, cls: rowStrong },
-            { k: 'Reference', v: reference, cls: rowMuted },
+            { k: rk.plan, v: planName, cls: rowSecondary },
+            { k: rk.amount, v: amountLabel, cls: rowStrong },
+            { k: rk.reference, v: reference, cls: rowMuted },
           ],
           // Locked decision 2: the timeout order is still resumable — reuse its checkoutUrl.
           primary: {
-            label: 'Retry payment',
+            label: t('paymentStatus.timeout.primary'),
             onClick: () =>
               order?.checkoutUrl ? window.location.assign(order.checkoutUrl) : navigate('/billing/plans'),
           },
-          secondary: { label: 'Choose another plan', onClick: () => navigate('/billing/plans') },
-          footNote:
-            'Charged anyway? Any unconfirmed authorisation is released by your bank automatically, usually within a few business days.',
+          secondary: {
+            label: t('paymentStatus.timeout.secondary'),
+            onClick: () => navigate('/billing/plans'),
+          },
+          footNote: t('paymentStatus.timeout.footNote'),
           showProgress: false,
         };
 
       case 'declined':
         return {
           marker: <Ring tone="warning" glyph="!" />,
-          eyebrow: 'Payment failed',
+          eyebrow: t('paymentStatus.declined.eyebrow'),
           eyebrowCls: 'text-danger',
-          title: 'Payment failed',
-          subtitle: 'Something went wrong. Please try again — no money was charged.',
+          title: t('paymentStatus.declined.title'),
+          subtitle: t('paymentStatus.declined.subtitle'),
           banner: {
             variant: 'error',
-            text: order?.reasonDetail ?? 'The payment provider reported an error.',
+            // `reasonDetail` is the raw provider/backend message, shown verbatim on purpose
+            // (§6.5 intentional exception) — never translated; only the fallback gets a key.
+            text: order?.reasonDetail ?? t('paymentStatus.declined.bannerFallback'),
           },
           showWell: true,
-          wellLabel: 'Attempted order',
-          pillLabel: 'Failed',
+          wellLabel: t('paymentStatus.declined.wellLabel'),
+          pillLabel: t('paymentStatus.declined.pill'),
           pillCls: 'bg-danger/15 text-danger',
           rows: [
-            { k: 'Plan', v: planName, cls: rowSecondary },
-            { k: 'Amount', v: amountLabel, cls: rowStrong },
-            { k: 'Reference', v: reference, cls: rowMuted },
+            { k: rk.plan, v: planName, cls: rowSecondary },
+            { k: rk.amount, v: amountLabel, cls: rowStrong },
+            { k: rk.reference, v: reference, cls: rowMuted },
           ],
           // Terminal failure: start fresh rather than resume a dead order (locked decision 2).
-          primary: { label: 'Retry payment', onClick: () => navigate('/billing/plans') },
-          secondary: { label: 'Back to dashboard', onClick: () => navigate('/dashboard') },
-          footNote:
-            "No charge was made. You can try another card or plan whenever you're ready.",
+          primary: { label: t('paymentStatus.declined.primary'), onClick: () => navigate('/billing/plans') },
+          secondary: { label: t('paymentStatus.declined.secondary'), onClick: () => navigate('/dashboard') },
+          footNote: t('paymentStatus.declined.footNote'),
           showProgress: false,
         };
 
       case 'refunded':
         return {
           marker: <Ring tone="warning" glyph="!" />,
-          eyebrow: 'Payment refunded',
+          eyebrow: t('paymentStatus.refunded.eyebrow'),
           eyebrowCls: 'text-warning',
-          title: 'Money refunded',
-          subtitle:
-            'This payment was refunded and the charge reversed. Your existing access stays active until it expires.',
+          title: t('paymentStatus.refunded.title'),
+          subtitle: t('paymentStatus.refunded.subtitle'),
           banner: {
             variant: 'warning',
-            text: order?.reasonDetail ?? 'This payment was reversed by the provider.',
+            // `reasonDetail` shown verbatim on purpose (§6.5 exception); only the fallback is keyed.
+            text: order?.reasonDetail ?? t('paymentStatus.refunded.bannerFallback'),
           },
           showWell: true,
-          wellLabel: 'Refunded order',
-          pillLabel: 'Refunded',
+          wellLabel: t('paymentStatus.refunded.wellLabel'),
+          pillLabel: t('paymentStatus.refunded.pill'),
           pillCls: 'bg-warning/15 text-warning',
           rows: [
-            { k: 'Plan', v: planName, cls: rowSecondary },
-            { k: 'Amount', v: amountLabel, cls: rowStrong },
-            { k: 'Access until', v: accessUntil ?? '—', cls: rowBid },
-            { k: 'Reference', v: reference, cls: rowMuted },
+            { k: rk.plan, v: planName, cls: rowSecondary },
+            { k: rk.amount, v: amountLabel, cls: rowStrong },
+            { k: rk.accessUntil, v: accessUntil ?? '—', cls: rowBid },
+            { k: rk.reference, v: reference, cls: rowMuted },
           ],
           // Access is kept (monetization-api.md §3) — the primary sends the user back into the app.
-          primary: { label: 'Open terminal →', onClick: () => navigate('/dashboard') },
-          secondary: { label: 'Choose another plan', onClick: () => navigate('/billing/plans') },
-          footNote: 'The refund should appear on your statement within a few business days.',
+          primary: { label: t('paymentStatus.refunded.primary'), onClick: () => navigate('/dashboard') },
+          secondary: {
+            label: t('paymentStatus.refunded.secondary'),
+            onClick: () => navigate('/billing/plans'),
+          },
+          footNote: t('paymentStatus.refunded.footNote'),
           showProgress: false,
         };
 
       case 'notfound':
         return {
           marker: <Ring tone="warning" glyph="!" />,
-          eyebrow: 'Order not found',
+          eyebrow: t('paymentStatus.notfound.eyebrow'),
           eyebrowCls: 'text-danger',
-          title: 'Order not found',
-          subtitle:
-            "We couldn't find an active order, or your invoice has been canceled. Did you cancel your payment?",
+          title: t('paymentStatus.notfound.title'),
+          subtitle: t('paymentStatus.notfound.subtitle'),
           banner: {
             variant: 'warning',
-            text: 'If you canceled your order, ignore this message. Otherwise try refreshing this page or start the payment again.',
+            text: t('paymentStatus.notfound.banner'),
           },
           // On a true 404 (no order at all) the well has nothing to show; hide it. An EXPIRED
           // order still carries data, so keep the well then.
           showWell: order !== null,
-          wellLabel: 'Order',
-          pillLabel: 'Not found',
+          wellLabel: t('paymentStatus.notfound.wellLabel'),
+          pillLabel: t('paymentStatus.notfound.pill'),
           pillCls: 'bg-danger/15 text-danger',
           rows: [
-            { k: 'Plan', v: planName, cls: rowSecondary },
-            { k: 'Amount', v: amountLabel, cls: rowStrong },
-            { k: 'Reference', v: reference, cls: rowMuted },
+            { k: rk.plan, v: planName, cls: rowSecondary },
+            { k: rk.amount, v: amountLabel, cls: rowStrong },
+            { k: rk.reference, v: reference, cls: rowMuted },
           ],
-          primary: { label: 'Start payment', onClick: () => navigate('/billing/plans') },
-          secondary: { label: 'Back to dashboard', onClick: () => navigate('/dashboard') },
-          footNote: 'Already paid? Give it a minute and refresh — confirmations can lag behind the redirect.',
+          primary: { label: t('paymentStatus.notfound.primary'), onClick: () => navigate('/billing/plans') },
+          secondary: { label: t('paymentStatus.notfound.secondary'), onClick: () => navigate('/dashboard') },
+          footNote: t('paymentStatus.notfound.footNote'),
           showProgress: false,
         };
 
@@ -199,22 +223,20 @@ export function PaymentStatusPage() {
       default:
         return {
           marker: <Spinner />,
-          eyebrow: 'Billing · Multicard',
+          eyebrow: t('paymentStatus.confirming.eyebrow'),
           eyebrowCls: 'text-accent',
-          title: 'Confirming your payment…',
-          subtitle:
-            'Your bank and Multicard are settling the transaction. This can take up to a minute — keep this tab open.',
+          title: t('paymentStatus.confirming.title'),
+          subtitle: t('paymentStatus.confirming.subtitle'),
           showWell: true,
-          wellLabel: 'Pending order',
-          pillLabel: 'Awaiting confirmation',
+          wellLabel: t('paymentStatus.confirming.wellLabel'),
+          pillLabel: t('paymentStatus.confirming.pill'),
           pillCls: 'bg-warning/15 text-warning',
           rows: [
-            { k: 'Plan', v: planName, cls: rowSecondary },
-            { k: 'Amount', v: amountLabel, cls: rowStrong },
-            { k: 'Reference', v: reference, cls: rowMuted },
+            { k: rk.plan, v: planName, cls: rowSecondary },
+            { k: rk.amount, v: amountLabel, cls: rowStrong },
+            { k: rk.reference, v: reference, cls: rowMuted },
           ],
-          footNote:
-            "Do not refresh or navigate away. If confirmation takes longer than 90 seconds we'll stop and let you retry.",
+          footNote: t('paymentStatus.confirming.footNote'),
           showProgress: true,
         };
     }

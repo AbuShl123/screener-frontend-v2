@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/Button';
 import { TickerStrip } from '@/components/TickerStrip';
 import { useLandingNav } from '../useLandingNav';
@@ -9,13 +10,14 @@ function scrollToPricing() {
 }
 
 function StatsRow() {
+  const { t } = useTranslation('landing');
   return (
     <div className="mx-auto grid max-w-[1140px] grid-cols-4 gap-6 px-8 pb-[56px]">
       {STATS.map((stat) => (
-        <div key={stat.caption} className="border-t border-border-subtle pt-4">
+        <div key={stat.captionKey} className="border-t border-border-subtle pt-4">
           <div className="font-mono text-[24px] text-text-strong">{stat.value}</div>
           <div className="mt-[6px] font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-            {stat.caption}
+            {t(stat.captionKey)}
           </div>
         </div>
       ))}
@@ -28,6 +30,7 @@ function StatsRow() {
  * OrderBookPreview, the 4-stat row, and the reused TickerStrip.
  */
 export function HeroSection() {
+  const { t } = useTranslation('landing');
   const { isAuthed, startTrial, goDashboard } = useLandingNav();
 
   return (
@@ -35,17 +38,19 @@ export function HeroSection() {
       <div className="mx-auto grid max-w-[1140px] grid-cols-[1.05fr_0.95fr] items-center gap-16 px-8 pb-[72px] pt-[88px]">
         <div>
           <div className="mb-[18px] font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
-            Real-time market intelligence
+            {t('hero.eyebrow')}
           </div>
           <h1 className="mb-[22px] text-[44px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
-            Every level that matters, in real time.
+            {t('hero.title')}
           </h1>
           <p className="mb-8 max-w-[52ch] text-[16px] leading-[1.6] text-text-secondary">
-            Screener maintains live order books for{' '}
-            <span className="font-mono text-text-strong">500+</span> spot and futures tickers across{' '}
-            <span className="font-mono text-text-strong">20+</span> crypto exchanges, classifies
-            every price level against your own thresholds, and streams the result to you in under a
-            second.
+            {/* Full sentence as one key; the styled figures are marked with <mono> so word
+                order can differ in RU (plan §5 — never concatenate translated fragments). */}
+            <Trans
+              t={t}
+              i18nKey="hero.lead"
+              components={{ mono: <span className="font-mono text-text-strong" /> }}
+            />
           </p>
           <div className="mb-[14px] flex items-center gap-3">
             {isAuthed ? (
@@ -55,7 +60,7 @@ export function HeroSection() {
                 onClick={goDashboard}
                 className="px-6 py-[14px]"
               >
-                Go to dashboard
+                {t('hero.goDashboard')}
               </Button>
             ) : (
               <Button
@@ -64,7 +69,7 @@ export function HeroSection() {
                 onClick={startTrial}
                 className="px-6 py-[14px]"
               >
-                Start {TRIAL_DAYS}-day free trial
+                {t('hero.startTrial', { days: TRIAL_DAYS })}
               </Button>
             )}
             <Button
@@ -73,11 +78,11 @@ export function HeroSection() {
               onClick={scrollToPricing}
               className="px-6 py-[14px]"
             >
-              See pricing
+              {t('hero.seePricing')}
             </Button>
           </div>
           <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-dim">
-            free on first registration · no card needed
+            {t('hero.noCard')}
           </div>
         </div>
 

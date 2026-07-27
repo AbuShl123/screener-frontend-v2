@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, type NavigateFunction } from 'react-router-dom';
 import { Button } from '@/components/Button';
 import { AccountLayout } from '../components/AccountLayout';
@@ -31,6 +32,7 @@ type CopyFn = (key: string, text: string) => void;
  * ported into `historyView.ts`; this component just wires them to the fetched data.
  */
 export function BillingHistoryPage() {
+  const { t } = useTranslation('billing');
   const navigate = useNavigate();
   const orders = useOrders();
   const ledger = useEntitlementHistory();
@@ -64,27 +66,30 @@ export function BillingHistoryPage() {
   // "Access through" reads the newest ledger row's newExpiresAt, matching the design (the ledger
   // is what it renders — should agree with /me's accessExpiresAt).
   const accessThrough = ledgerList.length ? fmtDate(ledgerList[0].newExpiresAt) : '—';
-  const grantsWord = ledgerList.length === 1 ? 'grant' : 'grants';
-  const headerCaption = `${orderList.length} orders · ${ledgerList.length} ${grantsWord} · access through ${accessThrough}`;
+  const headerCaption = t('history.caption', {
+    orders: t('history.ordersCount', { count: orderList.length }),
+    grants: t('history.grantsCount', { count: ledgerList.length }),
+    access: accessThrough,
+  });
 
   return (
     <AccountLayout>
       <div className="max-w-[1000px] p-10">
         <div className="font-sans text-[27px] font-semibold tracking-[-0.01em] text-text">
-          Billing history
+          {t('history.title')}
         </div>
         <div className="mt-2 font-mono text-[12px] text-text-dim">{headerCaption}</div>
 
         {/* ===== Tabs ===== */}
         <div className="mt-7 flex items-center gap-7 border-b border-border-subtle">
           <TabButton
-            label="Payments"
+            label={t('history.tabs.payments')}
             count={orderList.length}
             active={tab === 'payments'}
             onClick={() => setTab('payments')}
           />
           <TabButton
-            label="Access grants"
+            label={t('history.tabs.grants')}
             count={ledgerList.length}
             active={tab === 'grants'}
             onClick={() => setTab('grants')}
@@ -97,11 +102,11 @@ export function BillingHistoryPage() {
               <PaymentsEmpty onChoosePlan={() => navigate('/billing/plans')} />
             ) : (
               <div>
-                <div className="grid grid-cols-[128px_1fr_132px_104px_28px] gap-4 border-b border-border-subtle px-4 py-[14px]">
-                  <HeaderCell>Status</HeaderCell>
-                  <HeaderCell>Plan</HeaderCell>
-                  <HeaderCell align="right">Amount</HeaderCell>
-                  <HeaderCell align="right">Date</HeaderCell>
+                <div className="grid grid-cols-[128px_1fr_132px_120px_28px] gap-4 border-b border-border-subtle px-4 py-[14px]">
+                  <HeaderCell>{t('history.cols.status')}</HeaderCell>
+                  <HeaderCell>{t('history.cols.plan')}</HeaderCell>
+                  <HeaderCell align="right">{t('history.cols.amount')}</HeaderCell>
+                  <HeaderCell align="right">{t('history.cols.date')}</HeaderCell>
                   <span />
                 </div>
                 {orderList.map((order) => (
@@ -121,19 +126,18 @@ export function BillingHistoryPage() {
           </div>
         ) : (
           <div className="mt-1">
-            <div className="grid grid-cols-[104px_128px_1fr_116px_152px] gap-4 border-b border-border-subtle px-4 py-[14px]">
-              <HeaderCell>Date</HeaderCell>
-              <HeaderCell>Source</HeaderCell>
-              <HeaderCell>Grant</HeaderCell>
-              <HeaderCell align="right">Added</HeaderCell>
-              <HeaderCell align="right">Access through</HeaderCell>
+            <div className="grid grid-cols-[120px_128px_1fr_116px_152px] gap-4 border-b border-border-subtle px-4 py-[14px]">
+              <HeaderCell>{t('history.cols.date')}</HeaderCell>
+              <HeaderCell>{t('history.cols.source')}</HeaderCell>
+              <HeaderCell>{t('history.cols.grant')}</HeaderCell>
+              <HeaderCell align="right">{t('history.cols.added')}</HeaderCell>
+              <HeaderCell align="right">{t('history.cols.accessThrough')}</HeaderCell>
             </div>
             {ledgerList.map((g, i) => (
               <GrantRow key={`${g.source}:${g.createdAt}:${i}`} grant={g} onViewOrder={viewOrder} />
             ))}
             <div className="mt-4 font-mono text-[11px] leading-[1.6] text-text-dim">
-              Only successful grants appear here — trials, paid purchases and admin credits. Failed
-              or expired orders never grant access, so they live under Payments.
+              {t('history.grantsNote')}
             </div>
           </div>
         )}
@@ -211,10 +215,12 @@ function OrderRow({
   cancelOrder: ReturnType<typeof useCancelOrder>;
   navigate: NavigateFunction;
 }) {
+  const { t } = useTranslation('billing');
   // Lazy: history only fetches once the row is first expanded (`enabled`), then stays cached.
   const history = useOrderHistory(order.orderId, expanded);
 
   const meta = STATUS[order.status];
+  const planNameKey = PLAN[order.planCode];
   const isOpen = order.status === 'CREATED' || order.status === 'PENDING';
   const isPaid = order.status === 'PAID';
 
@@ -228,17 +234,17 @@ function OrderRow({
     >
       <div
         onClick={onToggle}
-        className="grid cursor-pointer grid-cols-[128px_1fr_132px_104px_28px] items-center gap-4 px-4 py-[15px] transition-colors hover:bg-white/[0.02]"
+        className="grid cursor-pointer grid-cols-[128px_1fr_132px_120px_28px] items-center gap-4 px-4 py-[15px] transition-colors hover:bg-white/[0.02]"
       >
         <div className="flex items-center gap-[7px]">
           <span className="h-[6px] w-[6px] flex-none rounded-full" style={{ background: meta.color }} />
           <span className="whitespace-nowrap font-mono text-[12px] font-medium uppercase tracking-[0.04em] text-text">
-            {meta.label}
+            {t(meta.labelKey)}
           </span>
         </div>
         <div className="min-w-0">
           <div className="font-sans text-[14px] font-medium text-text">
-            {PLAN[order.planCode] ?? order.planCode}
+            {planNameKey ? t(planNameKey) : order.planCode}
           </div>
         </div>
         <span className="whitespace-nowrap text-right font-mono text-[14px] text-text-strong">
@@ -271,17 +277,17 @@ function OrderRow({
           {/* Left — order details + actions */}
           <div className="max-w-full flex-[0_0_320px]">
             <div className="px-[2px]">
-              <DetailRow label="Order ID">
+              <DetailRow label={t('history.order.orderId')}>
                 <CopyButton
                   copied={copied === `${order.orderId}:id`}
                   label={`${order.orderId.slice(0, 8)}…`}
                   onClick={() => onCopy(`${order.orderId}:id`, order.orderId)}
                 />
               </DetailRow>
-              <DetailRow label="Provider">
+              <DetailRow label={t('history.order.provider')}>
                 <span className="font-mono text-[12px] text-text-strong">{order.provider}</span>
               </DetailRow>
-              <DetailRow label="Provider ref">
+              <DetailRow label={t('history.order.providerRef')}>
                 {order.providerUuid ? (
                   <CopyButton
                     copied={copied === `${order.orderId}:ref`}
@@ -292,9 +298,9 @@ function OrderRow({
                   <span className="font-mono text-[12px] text-text-dim">—</span>
                 )}
               </DetailRow>
-              <DetailRow label="Access bought">
+              <DetailRow label={t('history.order.accessBought')}>
                 <span className="font-mono text-[12px] text-text-strong">
-                  {days(order.accessDurationSeconds)} days
+                  {t('plans.dayCount', { count: days(order.accessDurationSeconds) })}
                 </span>
               </DetailRow>
 
@@ -309,7 +315,7 @@ function OrderRow({
                       }}
                       className="flex-none whitespace-nowrap rounded-[8px] border border-border-input bg-text-muted px-4 py-[11px] font-sans text-[14px] font-medium leading-none text-bg outline-none transition-[filter] duration-150 hover:brightness-110"
                     >
-                      Complete payment
+                      {t('history.order.complete')}
                     </button>
                     <button
                       type="button"
@@ -317,7 +323,7 @@ function OrderRow({
                       disabled={cancelOrder.isPending}
                       className="flex-none whitespace-nowrap rounded-[8px] border border-border-input bg-transparent px-4 py-[11px] font-sans text-[14px] font-medium leading-none text-text-muted outline-none transition-colors duration-150 hover:bg-text-muted/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {cancelOrder.isPending ? 'Cancelling…' : 'Cancel order'}
+                      {cancelOrder.isPending ? t('history.order.cancelling') : t('history.order.cancel')}
                     </button>
                   </>
                 )}
@@ -343,7 +349,7 @@ function OrderRow({
                       <polyline points="15 3 21 3 21 9" />
                       <line x1="10" y1="14" x2="21" y2="3" />
                     </svg>
-                    Open receipt
+                    {t('history.order.openReceipt')}
                   </a>
                 )}
               </div>
@@ -353,33 +359,45 @@ function OrderRow({
           {/* Right — status-transition timeline (lazy) */}
           <div className="min-w-0 flex-[1_1_300px]">
             <div className="mb-4 text-right font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
-              Status history
+              {t('history.order.statusHistory')}
             </div>
             <div className="border-r border-border pr-[22px]">
               {history.isLoading ? (
-                <div className="py-1 text-right font-mono text-[12px] text-text-dim">Loading…</div>
+                <div className="py-1 text-right font-mono text-[12px] text-text-dim">
+                  {t('history.order.loading')}
+                </div>
               ) : history.isError ? (
                 <div className="py-1 text-right font-mono text-[12px] text-text-dim">
-                  Couldn’t load status history.
+                  {t('history.order.loadError')}
                 </div>
               ) : (
-                buildTimeline(history.data ?? []).map((h) => (
-                  <div key={h.key} className="relative pb-4 text-right">
-                    <span
-                      className="absolute -right-[27px] top-[2px] h-[9px] w-[9px] rounded-full border-2 border-bg"
-                      style={{ background: h.dotColor }}
-                    />
-                    <div className="flex flex-wrap items-baseline justify-end gap-[10px]">
-                      <span className="font-mono text-[11px] text-text-dim">{h.timeStr}</span>
-                      <span className="font-sans text-[13px] font-medium text-text">{h.toLabel}</span>
-                    </div>
-                    {h.reasonLine && (
-                      <div className="mt-[3px] font-mono text-[12px] text-text-secondary">
-                        {h.reasonLine}
+                buildTimeline(history.data ?? []).map((h) => {
+                  // Resolve the base reason (mapped/default key, or a verbatim unmapped code),
+                  // then join the untranslated `reasonDetail` (§6.5) via the template key.
+                  const base = h.reasonBaseKey ? t(h.reasonBaseKey) : (h.reasonBaseRaw ?? '');
+                  const reasonLine = h.reasonDetail
+                    ? base
+                      ? t('history.reasonWithDetail', { reason: base, detail: h.reasonDetail })
+                      : h.reasonDetail
+                    : base;
+                  return (
+                    <div key={h.key} className="relative pb-4 text-right">
+                      <span
+                        className="absolute -right-[27px] top-[2px] h-[9px] w-[9px] rounded-full border-2 border-bg"
+                        style={{ background: h.dotColor }}
+                      />
+                      <div className="flex flex-wrap items-baseline justify-end gap-[10px]">
+                        <span className="font-mono text-[11px] text-text-dim">{h.timeStr}</span>
+                        <span className="font-sans text-[13px] font-medium text-text">{t(h.toLabelKey)}</span>
                       </div>
-                    )}
-                  </div>
-                ))
+                      {reasonLine && (
+                        <div className="mt-[3px] font-mono text-[12px] text-text-secondary">
+                          {reasonLine}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -407,13 +425,14 @@ function CopyButton({
   label: string;
   onClick: () => void;
 }) {
+  const { t } = useTranslation('billing');
   return (
     <button
       type="button"
       onClick={onClick}
       className="inline-flex items-center gap-[7px] border-none bg-transparent p-0 font-mono text-[12px] text-text-strong transition-colors hover:text-accent"
     >
-      {copied ? 'Copied' : label}
+      {copied ? t('history.order.copied') : label}
       <svg
         width="13"
         height="13"
@@ -433,16 +452,16 @@ function CopyButton({
 }
 
 function PaymentsEmpty({ onChoosePlan }: { onChoosePlan: () => void }) {
+  const { t } = useTranslation('billing');
   return (
     <div className="mt-8 rounded-[10px] border border-dashed border-border px-8 py-14 text-center">
-      <div className="font-sans text-[16px] font-semibold text-text">No payments yet</div>
+      <div className="font-sans text-[16px] font-semibold text-text">{t('history.empty.title')}</div>
       <p className="mx-auto mt-[10px] max-w-[380px] font-sans text-[14px] leading-[1.6] text-text-secondary">
-        You haven’t made any payment attempts. When you subscribe or top up, every order shows up
-        here — paid, pending or failed.
+        {t('history.empty.body')}
       </p>
       <div className="mt-5 inline-flex">
         <Button variant="primary" fullWidth={false} onClick={onChoosePlan}>
-          Choose a plan
+          {t('history.empty.cta')}
         </Button>
       </div>
     </div>
@@ -460,38 +479,45 @@ function GrantRow({
   grant: EntitlementLedgerEntry;
   onViewOrder: (orderId: string) => void;
 }) {
-  const meta = SOURCE[grant.source] ?? { label: grant.source, color: 'var(--color-text-muted)' };
+  const { t } = useTranslation('billing');
+  const source = SOURCE[grant.source];
+  const sourceColor = source?.color ?? 'var(--color-text-muted)';
+  const sourceLabel = source ? t(source.labelKey) : grant.source;
 
   let title: string;
   let sub: string;
   if (grant.source === 'PURCHASE' && grant.order) {
-    title = `${PLAN[grant.order.planCode] ?? grant.order.planCode} purchase`;
+    const planKey = PLAN[grant.order.planCode];
+    title = t('history.grant.purchaseTitle', {
+      plan: planKey ? t(planKey) : grant.order.planCode,
+    });
     sub = fmtAmount(grant.order.amount, grant.order.currency);
   } else if (grant.source === 'TRIAL') {
-    title = 'Free trial started';
-    sub = grant.reason ?? 'Seeded on registration';
+    title = t('history.grant.trialTitle');
+    // `grant.reason` is verbatim backend data (§6.5); only the frontend default is translated.
+    sub = grant.reason ?? t('history.grant.trialSubDefault');
   } else if (grant.source === 'ADMIN') {
-    title = 'Admin credit granted';
+    title = t('history.grant.adminTitle');
     sub = grant.reason ?? '';
   } else {
-    title = meta.label;
+    title = sourceLabel;
     sub = grant.reason ?? '';
   }
   const order = grant.source === 'PURCHASE' ? grant.order : null;
 
   return (
-    <div className="grid grid-cols-[104px_128px_1fr_116px_152px] items-center gap-4 border-b border-border-subtle px-4 py-4">
+    <div className="grid grid-cols-[120px_128px_1fr_116px_152px] items-center gap-4 border-b border-border-subtle px-4 py-4">
       <span className="font-mono text-[13px] text-text-secondary">{fmtDate(grant.createdAt)}</span>
       <div>
         <span
           className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-full border px-[11px] py-[5px] font-mono text-[11px] uppercase tracking-[0.06em]"
           style={{
-            color: meta.color,
-            borderColor: tint(meta.color, 35),
-            background: tint(meta.color, 10),
+            color: sourceColor,
+            borderColor: tint(sourceColor, 35),
+            background: tint(sourceColor, 10),
           }}
         >
-          {meta.label}
+          {sourceLabel}
         </span>
       </div>
       <div className="min-w-0">
@@ -507,13 +533,13 @@ function GrantRow({
               }}
               className="font-mono text-[11px] text-accent transition-[filter] hover:brightness-110"
             >
-              View order →
+              {t('history.grant.viewOrder')}
             </a>
           )}
         </div>
       </div>
       <span className="whitespace-nowrap text-right font-mono text-[14px] font-medium text-bid">
-        +{days(grant.grantedDurationSeconds)} days
+        {t('history.grant.added', { count: days(grant.grantedDurationSeconds) })}
       </span>
       <div className="text-right">
         <div className="whitespace-nowrap font-mono text-[14px] text-text-strong">
@@ -521,7 +547,7 @@ function GrantRow({
         </div>
         {grant.previousExpiresAt && (
           <div className="mt-[3px] font-mono text-[11px] text-text-dim">
-            was {fmtDate(grant.previousExpiresAt)}
+            {t('history.grant.was', { date: fmtDate(grant.previousExpiresAt) })}
           </div>
         )}
       </div>

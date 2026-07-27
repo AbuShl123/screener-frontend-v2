@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   fmtClock,
   fmtDistance,
@@ -24,6 +25,7 @@ interface NotificationCardProps {
  * template stripe is solid, unlike the row bars).
  */
 export function NotificationCard({ notification: n, sizeMode }: NotificationCardProps) {
+  const { t } = useTranslation('orderbook');
   const badge = marketBadge(n.market);
   const isUsd = sizeMode === 'usd';
 
@@ -48,7 +50,7 @@ export function NotificationCard({ notification: n, sizeMode }: NotificationCard
               {badge.label}
             </span>
             <span className="font-mono text-[11px] font-semibold tracking-[0.12em] text-text-strong">
-              {n.side === 'bid' ? 'BID' : 'ASK'}
+              {n.side === 'bid' ? t('notification.side.bid') : t('notification.side.ask')}
             </span>
           </div>
           <span className="font-mono text-[11px] tracking-[0.04em] text-text-dim">
@@ -58,12 +60,12 @@ export function NotificationCard({ notification: n, sizeMode }: NotificationCard
 
         {/* Row 2: 3-col metrics grid */}
         <div className="grid grid-cols-3 gap-2.5 border-t border-border-subtle pt-2.5">
-          <Metric label="PRICE" value={n.price.toFixed(priceDecimals(n.price))} />
+          <Metric label={t('notification.metric.price')} value={n.price.toFixed(priceDecimals(n.price))} />
           <Metric
-            label={isUsd ? 'NOTIONAL' : 'SIZE'}
+            label={isUsd ? t('notification.metric.notional') : t('notification.metric.size')}
             value={isUsd ? fmtMoney(n.notional) : fmtQty(n.notional / n.price)}
           />
-          <Metric label="DIST" value={fmtDistance(n.distance)} align="right" />
+          <Metric label={t('notification.metric.dist')} value={fmtDistance(n.distance)} align="right" />
         </div>
       </div>
     </div>

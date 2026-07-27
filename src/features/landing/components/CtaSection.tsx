@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/Button';
 import { useLandingNav } from '../useLandingNav';
 import { TRIAL_DAYS } from '../constants';
@@ -8,19 +9,20 @@ import { TRIAL_DAYS } from '../constants';
  * single Go to dashboard.
  */
 export function CtaSection() {
+  const { t } = useTranslation('landing');
   const { isAuthed, signIn, createAccount, goDashboard } = useLandingNav();
 
   return (
     <section className="border-t border-border-subtle">
       <div className="mx-auto max-w-[1140px] px-8 py-[80px] text-center">
         <div className="mb-4 font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
-          Get started
+          {t('cta.eyebrow')}
         </div>
         <h2 className="mb-[14px] text-[38px] font-semibold leading-[1.15] tracking-[-0.02em] text-text">
-          Start with {TRIAL_DAYS} days free.
+          {t('cta.title', { days: TRIAL_DAYS })}
         </h2>
         <p className="mb-8 text-[15px] leading-[1.6] text-text-muted">
-          No card needed. Full access from the first minute.
+          {t('cta.subtitle')}
         </p>
         <div className="flex items-center justify-center gap-3">
           {isAuthed ? (
@@ -30,7 +32,7 @@ export function CtaSection() {
               onClick={goDashboard}
               className="px-7 py-[14px]"
             >
-              Go to dashboard
+              {t('cta.goDashboard')}
             </Button>
           ) : (
             <>
@@ -40,7 +42,7 @@ export function CtaSection() {
                 onClick={createAccount}
                 className="px-7 py-[14px]"
               >
-                Create account
+                {t('cta.createAccount')}
               </Button>
               <Button
                 variant="outline"
@@ -48,7 +50,7 @@ export function CtaSection() {
                 onClick={signIn}
                 className="min-w-[110px] whitespace-nowrap px-7 py-[14px]"
               >
-                Sign in
+                {t('cta.signIn')}
               </Button>
             </>
           )}

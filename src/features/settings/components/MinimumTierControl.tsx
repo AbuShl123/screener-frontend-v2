@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { TIER_COLORS } from '@/features/orderbook/tiers';
 import { useNotificationSettingsStore } from '../notificationSettingsStore';
 
@@ -12,21 +13,23 @@ import { useNotificationSettingsStore } from '../notificationSettingsStore';
  * `tiers.ts` anticipated). Index 0 (no color) is skipped.
  */
 export function MinimumTierControl() {
+  const { t } = useTranslation('settings');
   const minTier = useNotificationSettingsStore((s) => s.minTier);
   const setMinTier = useNotificationSettingsStore((s) => s.setMinTier);
 
   const caption =
     minTier === 1
-      ? 'All tiers notify — nothing filtered by rank'
-      : `Notifying tier ${minTier}–4 · tier 1–${minTier - 1} filtered out`;
+      ? t('notifications.tier.captionAll')
+      : t('notifications.tier.caption', { min: minTier, prev: minTier - 1 });
 
   return (
     <section className="flex flex-col gap-[15px]">
       <div>
-        <h3 className="mb-[5px] text-[14px] font-semibold text-text">Minimum tier</h3>
+        <h3 className="mb-[5px] text-[14px] font-semibold text-text">
+          {t('notifications.tier.heading')}
+        </h3>
         <p className="max-w-[54ch] text-[13px] leading-[1.55] text-text-secondary">
-          Every order book level is classified 0–4 by significance. Notify only levels at or above
-          the tier you pick — anything lower is filtered out.
+          {t('notifications.tier.desc')}
         </p>
       </div>
 

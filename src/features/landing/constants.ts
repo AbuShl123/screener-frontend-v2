@@ -1,23 +1,34 @@
-// Static marketing copy for the landing page (plan §8.1). These are deliberate
-// advertising constants, NOT live figures.
+// Structural marketing constants for the landing page (plan §8.1). The user-facing
+// text has been extracted to the `landing` i18n namespace (plan §3 rollout): these
+// arrays now carry only the non-localized bits — the fixed marketing figures and the
+// glyph shapes — plus a stable key into `landing.json`, resolved with `t()` at render
+// (the §6.2 labelKey pattern). Adding/removing a card is still a one-line edit here.
+
+import type { ParseKeys } from 'i18next';
+
+/** A type-checked key into the `landing` namespace — a typo here is a compile error. */
+type LandingKey = ParseKeys<'landing'>;
 
 /**
  * Trial length shown across the landing (hero, CTA). Landing-feature constant
  * (plan §2.6) — swap for a backend value if trial length is ever exposed.
+ * Interpolated into the `{{days}}` slot of the trial copy, never concatenated.
  */
 export const TRIAL_DAYS = 7;
 
 export interface Stat {
+  /** Fixed marketing figure — a universally-readable number, never localized (plan §10.1). */
   value: string;
-  caption: string;
+  /** Key into `landing:hero.stats.*`, resolved with `t()` in the component. */
+  captionKey: LandingKey;
 }
 
-/** The four hero stat blocks (plan §8.1). Marketing copy, not live numbers. */
+/** The four hero stat blocks (plan §8.1). Values are fixed marketing figures. */
 export const STATS: Stat[] = [
-  { value: '500+', caption: 'Tickers · spot & futures' },
-  { value: '20+', caption: 'Exchanges covered' },
-  { value: '<1s', caption: 'Streaming latency' },
-  { value: '100K+/s', caption: 'Book updates processed' },
+  { value: '500+', captionKey: 'hero.stats.tickers' },
+  { value: '20+', captionKey: 'hero.stats.exchanges' },
+  { value: '<1s', captionKey: 'hero.stats.latency' },
+  { value: '100K+/s', captionKey: 'hero.stats.updates' },
 ];
 
 /**
@@ -30,40 +41,42 @@ export type FeatureGlyph =
 
 export interface Feature {
   glyph: FeatureGlyph;
-  label: string;
-  body: string;
+  /** Key into `landing:features.items.*.label`, resolved with `t()` in the component. */
+  labelKey: LandingKey;
+  /** Key into `landing:features.items.*.body`, resolved with `t()` in the component. */
+  bodyKey: LandingKey;
 }
 
-/** The six static Features cards (plan §8.1). Static advertising copy. */
+/** The six static Features cards (plan §8.1). Copy lives in `landing:features.items.*`. */
 export const FEATURES: Feature[] = [
   {
     glyph: { kind: 'square' },
-    label: 'Live order books',
-    body: 'Real-time local books for 500+ spot and futures tickers across 20+ exchanges, streamed over WebSockets in under a second.',
+    labelKey: 'features.items.liveBooks.label',
+    bodyKey: 'features.items.liveBooks.body',
   },
   {
     glyph: { kind: 'square' },
-    label: 'Rules you define',
-    body: 'Set custom classification thresholds per ticker. Levels are ranked by proximity to the spread and notional value — significance on your terms, not ours.',
+    labelKey: 'features.items.rules.label',
+    bodyKey: 'features.items.rules.body',
   },
   {
     glyph: { kind: 'text', char: '▁▃▂▅▇', className: 'text-accent', tracking: true },
-    label: 'Charts',
-    body: 'Volume-change charts for every ticker on every exchange, plus candlestick data — see where activity is building before the move.',
+    labelKey: 'features.items.charts.label',
+    bodyKey: 'features.items.charts.body',
   },
   {
     glyph: { kind: 'text', char: '▲', className: 'text-bid' },
-    label: 'Open interest alerts',
-    body: "When a ticker's open interest grows unusually large, you're notified the moment it happens — not an hour later.",
+    labelKey: 'features.items.oiAlerts.label',
+    bodyKey: 'features.items.oiAlerts.body',
   },
   {
     glyph: { kind: 'text', char: '◉', className: 'text-accent' },
-    label: 'Voice notifications',
-    body: 'Alerts are read out loud with text-to-speech. Watch the market without watching the screen.',
+    labelKey: 'features.items.voice.label',
+    bodyKey: 'features.items.voice.body',
   },
   {
     glyph: { kind: 'text', char: '<1s', className: 'text-accent' },
-    label: 'Built for volume',
-    body: 'Engineered for hundreds of thousands of book updates per second. No queues, no sampling, no lag — the number you see is the market now.',
+    labelKey: 'features.items.volume.label',
+    bodyKey: 'features.items.volume.body',
   },
 ];

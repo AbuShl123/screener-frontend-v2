@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '@/stores/notificationStore';
 
 interface NotificationHandleProps {
@@ -16,14 +17,15 @@ interface NotificationHandleProps {
  * re-renders only this handle — never `DashboardPage` and the grid (plan §8a).
  */
 export function NotificationHandle({ open, onOpen }: NotificationHandleProps) {
+  const { t } = useTranslation('orderbook');
   const unread = useNotificationStore((s) => s.unread);
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      title="Notifications"
-      aria-label="Open notifications"
+      title={t('panel.title')}
+      aria-label={t('panel.open')}
       className={`fixed right-0 top-24 z-40 flex h-12 w-12 items-center justify-center
                   rounded-l-[10px] border border-r-0 border-border bg-accent text-bg shadow-card
                   [transition:opacity_200ms_ease,filter_150ms_ease] hover:brightness-110 ${

@@ -1,6 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
+import { useValidationError } from '@/lib/i18n';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
@@ -59,16 +61,15 @@ function VerifyConfirm({
   pending: boolean;
   errored: boolean;
 }) {
+  const { t } = useTranslation(['auth', 'common']);
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       <div className="flex flex-col gap-[10px]">
         <h1 className="text-[28px] font-semibold tracking-[-0.01em] text-text">
-          Confirm your email
+          {t('verify.confirm.title')}
         </h1>
         <p className="text-[14px] leading-[1.6] text-text-secondary">
-          You&apos;re one click away. Confirm to activate
-          <br />
-          your account and start screening.
+          <Trans t={t} i18nKey="verify.confirm.body" components={{ br: <br /> }} />
         </p>
       </div>
 
@@ -78,7 +79,7 @@ function VerifyConfirm({
             let the user retry with the button re-enabled (API doc §3.2, plan §2.4). */}
         {errored ? (
           <Banner variant="error" className="w-full text-left">
-            Something went wrong. Please try again.
+            {t('common:errors.generic')}
           </Banner>
         ) : null}
         <Button
@@ -86,9 +87,9 @@ function VerifyConfirm({
           disabled={pending}
           onClick={onConfirm}
         >
-          {pending ? 'Confirming…' : 'Confirm email'}
+          {pending ? t('verify.confirm.submitting') : t('verify.confirm.submit')}
         </Button>
-        <span className="font-mono text-[11px] text-text-dim">this link is single-use</span>
+        <span className="font-mono text-[11px] text-text-dim">{t('verify.confirm.singleUse')}</span>
       </div>
     </div>
   );
@@ -96,18 +97,17 @@ function VerifyConfirm({
 
 /** 3f — verify resolved success. Verify issues no tokens: link to login, don't auto-login. */
 function VerifySuccess() {
+  const { t } = useTranslation('auth');
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       <AuthBadge className="text-[25px]">✓</AuthBadge>
 
       <div className="flex flex-col gap-[10px]">
         <h1 className="text-[28px] font-semibold tracking-[-0.01em] text-text">
-          Email confirmed
+          {t('verify.success.title')}
         </h1>
         <p className="text-[14px] leading-[1.6] text-text-secondary">
-          Your account is verified.
-          <br />
-          Sign in to start screening.
+          <Trans t={t} i18nKey="verify.success.body" components={{ br: <br /> }} />
         </p>
       </div>
 
@@ -115,7 +115,7 @@ function VerifySuccess() {
         to="/login"
         className="block w-full rounded-[8px] bg-accent px-[14px] py-[14px] text-center text-[15px] font-medium text-accent-ink no-underline transition-colors duration-150 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        Go to sign in
+        {t('verify.success.cta')}
       </Link>
     </div>
   );
@@ -127,6 +127,8 @@ function VerifySuccess() {
  * confirmation is purely cosmetic (always 202, no enumeration — API doc §3.3).
  */
 function VerifyInvalid() {
+  const { t } = useTranslation('auth');
+  const fieldError = useValidationError();
   const resendMut = useResendVerification();
   const cooldown = useCooldown(60);
 
@@ -142,28 +144,25 @@ function VerifyInvalid() {
   }
 
   const caption = cooldown.active
-    ? `resend available in ${cooldown.remaining} s`
+    ? t('verify.invalid.captionCooldown', { seconds: cooldown.remaining })
     : resendMut.isSuccess
-      ? 'Sent — check your inbox'
-      : 'if an unverified account exists, a link will be sent';
+      ? t('verify.invalid.captionSent')
+      : t('verify.invalid.captionDefault');
 
   return (
     <form onSubmit={handleSubmit(onValid)} noValidate className="flex flex-col gap-6">
       <div className="flex flex-col gap-[10px]">
         <h1 className="text-[28px] font-semibold tracking-[-0.01em] text-text [text-wrap:pretty]">
-          This link is invalid or has expired
+          {t('verify.invalid.title')}
         </h1>
-        <p className="text-[14px] leading-[1.6] text-text-secondary">
-          Verification links last 24 hours and work once. Enter your email and we&apos;ll send a
-          fresh one.
-        </p>
+        <p className="text-[14px] leading-[1.6] text-text-secondary">{t('verify.invalid.body')}</p>
       </div>
 
       <TextField
-        label="Email"
+        label={t('verify.invalid.emailLabel')}
         type="email"
-        placeholder="ada@example.com"
-        error={errors.email?.message}
+        placeholder={t('verify.invalid.emailPlaceholder')}
+        error={fieldError(errors.email?.message)}
         {...register('email')}
       />
 
@@ -173,7 +172,7 @@ function VerifyInvalid() {
           variant="primary"
           disabled={cooldown.active || resendMut.isPending}
         >
-          {resendMut.isPending ? 'Sending…' : 'Send new link'}
+          {resendMut.isPending ? t('verify.invalid.submitting') : t('verify.invalid.submit')}
         </Button>
         <span className="font-mono text-[11px] text-text-dim">{caption}</span>
       </div>
