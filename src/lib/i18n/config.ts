@@ -29,6 +29,7 @@ export const NAMESPACES = [
   'billing',
   'settings',
   'landing',
+  'admin',
   'validation',
 ] as const;
 

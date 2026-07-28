@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { logout, useMe } from '@/features/auth';
+import { accountHome } from '@/lib/accountHome';
 import { SortMenu } from '@/features/orderbook/components/SortMenu';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 import type { SortMode } from '@/features/orderbook/sortOrderbooks';
@@ -138,7 +139,7 @@ export function DashboardHeader({
       <button
         type="button"
         title={t('header.account')}
-        onClick={() => navigate('/account')}
+        onClick={() => navigate(accountHome(me.data?.role))}
         className="inline-flex h-9 w-9 items-center justify-center rounded-full border
                    border-accent/40 bg-accent/[0.18] font-mono text-[12px] font-medium
                    tracking-[0.04em] text-accent transition-colors hover:bg-accent/[0.28]"

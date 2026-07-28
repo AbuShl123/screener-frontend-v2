@@ -42,6 +42,9 @@ export {
   type CreateOrderRequest,
 } from './schemas';
 
+// Shared account-area shell (also used by the admin pages so profile + admin share one shell)
+export { AccountLayout } from './components/AccountLayout';
+
 // Pages
 export { AccountPage } from './pages/AccountPage';
 export { BillingHistoryPage } from './pages/BillingHistoryPage';

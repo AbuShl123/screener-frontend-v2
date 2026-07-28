@@ -3,7 +3,9 @@ import { CheckInboxPage, LoginPage, RegisterPage, VerifyEmailPage } from '@/feat
 import { SessionGate } from '@/app/SessionGate';
 import { ProtectedRoute } from '@/app/ProtectedRoute';
 import { PublicRoute } from '@/app/PublicRoute';
+import { AdminRoute } from '@/app/AdminRoute';
 import { DashboardPage } from '@/features/orderbook';
+import { AnalyticsPage, UsersPage } from '@/features/admin';
 import {
   AccountPage,
   BillingHistoryPage,
@@ -42,6 +44,29 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AccountPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Admin-only screens: token-presence via ProtectedRoute, role via AdminRoute.
+            `/account` itself stays the profile for everyone — the admin default lands via the
+            entry links (accountHome), not a route redirect (plan §5). */}
+        <Route
+          path="/account/analytics"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <AnalyticsPage />
+              </AdminRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/users"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <UsersPage />
+              </AdminRoute>
             </ProtectedRoute>
           }
         />

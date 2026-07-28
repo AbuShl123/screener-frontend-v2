@@ -33,6 +33,7 @@ import enOrderbook from './locales/en/orderbook.json';
 import enBilling from './locales/en/billing.json';
 import enSettings from './locales/en/settings.json';
 import enLanding from './locales/en/landing.json';
+import enAdmin from './locales/en/admin.json';
 import enValidation from './locales/en/validation.json';
 
 import ruCommon from './locales/ru/common.json';
@@ -41,6 +42,7 @@ import ruOrderbook from './locales/ru/orderbook.json';
 import ruBilling from './locales/ru/billing.json';
 import ruSettings from './locales/ru/settings.json';
 import ruLanding from './locales/ru/landing.json';
+import ruAdmin from './locales/ru/admin.json';
 import ruValidation from './locales/ru/validation.json';
 
 /** Bundled resources, keyed `locale → namespace`. Keep in lockstep with NAMESPACES/SUPPORTED_LOCALES. */
@@ -52,6 +54,7 @@ export const resources = {
     billing: enBilling,
     settings: enSettings,
     landing: enLanding,
+    admin: enAdmin,
     validation: enValidation,
   },
   ru: {
@@ -61,6 +64,7 @@ export const resources = {
     billing: ruBilling,
     settings: ruSettings,
     landing: ruLanding,
+    admin: ruAdmin,
     validation: ruValidation,
   },
 } as const;
@@ -108,7 +112,7 @@ export {
   type Locale,
   type Namespace,
 } from './config';
-export { formatDate } from './format';
+export { formatDate, fmtRelative } from './format';
 export { useValidationError } from './useValidationError';
 
 export default i18n;

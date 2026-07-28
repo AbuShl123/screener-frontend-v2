@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BrandMark } from '@/components/BrandMark';
 import { Button } from '@/components/Button';
 import { useMe } from '@/features/auth';
+import { accountHome } from '@/lib/accountHome';
 
 /**
  * Slim chrome header shared by the billing funnel pages (Choose Plan, Pay by Days,
@@ -32,7 +33,7 @@ export function BillingHeader() {
         <button
           type="button"
           title={t('header.account')}
-          onClick={() => navigate('/account')}
+          onClick={() => navigate(accountHome(me.data?.role))}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border
                      border-accent/40 bg-accent/[0.18] font-mono text-[12px] font-medium
                      tracking-[0.04em] text-accent transition-colors hover:bg-accent/[0.28]"

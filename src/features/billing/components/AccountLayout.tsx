@@ -5,6 +5,7 @@ import type { ParseKeys } from 'i18next';
 import { BrandMark } from '@/components/BrandMark';
 import { Button } from '@/components/Button';
 import { logout, useMe } from '@/features/auth';
+import { useUsersTotal } from '@/features/admin';
 
 /**
  * Shared account-area shell — header (BrandMark + "Go to dashboard") + left nav + sign-out —
@@ -21,9 +22,12 @@ const DISABLED_NAV: ParseKeys<'billing'>[] = ['accountNav.security', 'accountNav
 
 export function AccountLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation('billing');
+  const { t: tAdmin } = useTranslation('admin');
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const me = useMe();
+  const isAdmin = me.data?.role === 'ADMIN';
+  const usersTotal = useUsersTotal(isAdmin); // gated: only fetched for admins (plan §4b)
 
   const hasAccess = me.data ? me.data.accessState !== 'EXPIRED' : false;
 
@@ -94,6 +98,42 @@ export function AccountLayout({ children }: { children: ReactNode }) {
               {t(labelKey)}
             </div>
           ))}
+
+          {/* ADMIN nav block — role-gated (plan §4). "Account" above stays the profile for
+              everyone; these are distinct nav items, matching the design's navAdmin. */}
+          {isAdmin && (
+            <div className="mt-[18px] flex flex-col gap-[2px] border-t border-border-subtle pt-4">
+              <div className="px-[22px] pb-2 font-mono text-[10px] uppercase tracking-[0.08em] text-text-dim">
+                {tAdmin('nav.admin')}
+              </div>
+              {[
+                { label: tAdmin('nav.analytics'), path: '/account/analytics', meta: '' },
+                {
+                  label: tAdmin('nav.users'),
+                  path: '/account/users',
+                  meta: usersTotal.data != null ? usersTotal.data.toLocaleString('en-US') : '',
+                },
+              ].map(({ label, path, meta }) => {
+                const active = pathname === path;
+                return (
+                  <button
+                    key={path}
+                    type="button"
+                    onClick={() => !active && navigate(path)}
+                    className={
+                      active
+                        ? 'flex items-center justify-between gap-[10px] border-l-2 border-accent bg-accent/[0.08] py-[11px] pl-5 pr-[22px] text-left text-[14px] font-medium text-text'
+                        : 'flex cursor-pointer items-center justify-between gap-[10px] border-l-2 border-transparent py-[11px] pl-5 pr-[22px] text-left text-[14px] text-text-muted transition-colors hover:text-text'
+                    }
+                  >
+                    <span>{label}</span>
+                    {meta && <span className="font-mono text-[11px] text-text-dim">{meta}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="flex-1" />
           <div className="mt-2 border-t border-border-subtle px-[22px] pt-2">
             <button

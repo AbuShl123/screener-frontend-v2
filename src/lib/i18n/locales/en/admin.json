@@ -1,0 +1,126 @@
+{
+  "nav": {
+    "admin": "Admin",
+    "analytics": "Analytics",
+    "users": "Users"
+  },
+  "forbidden": {
+    "title": "You don't have access to this area",
+    "body": "This screen is available to administrators only."
+  },
+  "analytics": {
+    "title": "Usage analytics",
+    "subtitle": "Distinct users per time slice · zone {{zone}}",
+    "range": {
+      "label": "Date range",
+      "today": "Today",
+      "week": "Week",
+      "month": "Month",
+      "year": "Year",
+      "custom": "Custom"
+    },
+    "from": "From",
+    "to": "To",
+    "slice": {
+      "label": "Slice duration",
+      "year": "Year",
+      "month": "Month",
+      "24h": "24h",
+      "1h": "1h",
+      "30min": "30min"
+    },
+    "online": {
+      "label": "Online now",
+      "users": "users",
+      "sessions_one": "{{count}} open session",
+      "sessions_other": "{{count}} open sessions"
+    },
+    "totalConnections": "Total connections",
+    "mostActive": {
+      "label": "Most active slice",
+      "noData": "no data"
+    },
+    "chart": {
+      "uniqueLabel": "Unique connections",
+      "caption_one": "{{count}} slice · peak {{peak}}",
+      "caption_other": "{{count}} slices · peak {{peak}}",
+      "captionTooFine": "{{count}} slices requested",
+      "tip": "{{when}} — {{count}} online"
+    },
+    "tooFine": {
+      "banner": "This range at {{slice}} would return {{count}} slices in one response. Pick a coarser slice.",
+      "placeholder": "no chart — coarsen the slice"
+    },
+    "empty": "No usage recorded for this range."
+  },
+  "users": {
+    "title": "Users",
+    "caption": "{{total}} registered · showing {{shown}} on this page",
+    "loading": "Loading users…",
+    "filter": {
+      "role": "Role",
+      "status": "Status",
+      "user": "User",
+      "admin": "Admin",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activeHint": "active = verified & enabled"
+    },
+    "selectAll": "Select all",
+    "clearSelection": "Clear selection",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "noneSelected": "none selected",
+    "giftAccess": "Gift access",
+    "col": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "expires": "Access expires",
+      "lastSeen": "Last seen"
+    },
+    "status": {
+      "activeTitle": "active — verified & enabled",
+      "disabledTitle": "inactive — disabled",
+      "unverifiedTitle": "inactive — email not verified"
+    },
+    "state": {
+      "TRIAL": "Trial",
+      "ACTIVE": "Active",
+      "EXPIRED": "Expired",
+      "ADMIN": "Admin"
+    },
+    "never": "never",
+    "empty": "no users match these filters",
+    "page": "page {{page}} / {{total}}",
+    "size": "size",
+    "total": "{{count}} total",
+    "prev": "Prev",
+    "next": "Next"
+  },
+  "gift": {
+    "title": "Gift access",
+    "recipients": "Recipients",
+    "count_one": "{{count}} user",
+    "count_other": "{{count}} users",
+    "days": {
+      "label": "Add period days",
+      "unit": "days",
+      "hint": "addPeriodDays must be greater than 0"
+    },
+    "reason": {
+      "label": "Reason",
+      "optional": "optional",
+      "placeholder": "Beta tester compensation"
+    },
+    "note": "Days stack on top of each user's remaining access — this never sets an absolute expiry.",
+    "cancel": "Cancel",
+    "confirm_one": "Gift {{count}} day",
+    "confirm_other": "Gift {{count}} days",
+    "confirmDefault": "Gift access",
+    "pending": "Gifting…",
+    "dismiss": "Dismiss",
+    "success_one": "Gifted {{days}} days to {{count}} user. New expiry dates are reflected below.",
+    "success_other": "Gifted {{days}} days to {{count}} users. New expiry dates are reflected below."
+  }
+}
