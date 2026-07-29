@@ -17,8 +17,9 @@ import { useUsersTotal } from '@/features/admin';
 const NAV: { labelKey: ParseKeys<'billing'>; path: string }[] = [
   { labelKey: 'accountNav.account', path: '/account' },
   { labelKey: 'accountNav.billingHistory', path: '/account/billing-history' },
+  { labelKey: 'accountNav.settings', path: '/account/settings' },
 ];
-const DISABLED_NAV: ParseKeys<'billing'>[] = ['accountNav.security', 'accountNav.settings'];
+const DISABLED_NAV: ParseKeys<'billing'>[] = ['accountNav.security'];
 
 export function AccountLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation('billing');
@@ -39,7 +40,7 @@ export function AccountLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg font-sans text-text-secondary">
+    <div className="flex h-screen flex-col bg-bg font-sans text-text-secondary">
       {/* ===== Top bar ===== */}
       <header className="flex flex-none items-center justify-between border-b border-border-subtle px-6 py-[14px]">
         <BrandMark />

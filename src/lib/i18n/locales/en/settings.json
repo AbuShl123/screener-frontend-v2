@@ -1,4 +1,8 @@
 {
+  "page": {
+    "title": "Settings",
+    "subtitle": "Notification filters & classification thresholds — applied to every book you subscribe to"
+  },
   "modal": {
     "title": "Settings",
     "close": "Close",

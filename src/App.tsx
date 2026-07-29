@@ -16,6 +16,7 @@ import {
   PaymentStatusPage,
 } from '@/features/billing';
 import { LandingPage } from '@/features/landing';
+import { SettingsPage } from '@/features/settings';
 
 /**
  * Application shell. `SessionGate` gates the whole app on reload with a blocking
@@ -75,6 +76,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <BillingHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Settings for every user (admin or not): token-presence only, no AdminRoute. */}
+        <Route
+          path="/account/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />
