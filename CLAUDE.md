@@ -21,9 +21,8 @@ pinned to Russian via `FORCED_LOCALE`). Not yet started: charts.
 ## Multi-exchange support
 
 The backend streams more than one exchange (Binance + MEXC Futures today; MEXC Spot and Bybit
-later), and the frontend handles that end to end (built on the `feature/multi-exchange` branch,
-all plan phases done). Don't reintroduce Binance-only assumptions. **The plan behind it
-(decisions D1–D8, store shape, the masonry deviation) is
+later), and the frontend handles that end to end. Don't reintroduce Binance-only assumptions.
+**The plan behind it (decisions D1–D8, store shape, the masonry deviation) is
 [`.claude/plans/multi-exchange-review.md`](.claude/plans/multi-exchange-review.md); read it before
 touching the order book, notifications or the Settings pickers.**
 
@@ -367,7 +366,7 @@ and the pool is de-duplicated by `(symbol, market)` since rules and mutes are ex
 - [`.claude/plans/`](.claude/plans/) — phase-by-phase implementation plans for each feature as it
   was built; useful for the *why* behind a design decision that isn't obvious from the code alone.
   [`.claude/plans/multi-exchange-review.md`](.claude/plans/multi-exchange-review.md) is the
-  agreed plan for the in-flight multi-exchange work.
+  plan the multi-exchange support was built from.
 
 ## Working conventions
 
