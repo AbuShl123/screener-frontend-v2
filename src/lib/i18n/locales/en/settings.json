@@ -16,7 +16,7 @@
   "notifications": {
     "tier": {
       "heading": "Minimum tier",
-      "desc": "Every order book level is classified 0–4 by significance. Notify only levels at or above the tier you pick — anything lower is filtered out.",
+      "desc": "Every order book level is classified 1–4 by significance. Notify only levels at or above the tier you pick — anything lower is filtered out.",
       "captionAll": "All tiers notify — nothing filtered by rank",
       "caption": "Notifying tier {{min}}–4 · tier 1–{{prev}} filtered out"
     },

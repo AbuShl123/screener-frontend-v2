@@ -3,12 +3,15 @@ import type { Notification } from '@/features/orderbook/types';
 /**
  * De-duplication cooldown for notifications.
  *
- * The feed only sends the top-5 levels per side (doc §3.5), so a resting order at a
+ * The feed only sends the top-5 levels per side per exchange (doc §3.5), so a resting order at a
  * fixed price routinely drops OUT of that window and re-enters it as other orders
  * compete for the top-5 slots — each re-entry looks like a brand-new level to
  * `selectNotifications` (its price is absent from the previous book) and raises an
  * identical card. This suppresses those repeats: once an order is announced, the same
- * `(symbol, market, side, price, tier)` stays quiet for `COOLDOWN_MS`.
+ * `(exchange, symbol, market, side, price, tier)` stays quiet for `COOLDOWN_MS`.
+ *
+ * `exchange` is part of the key so the same price on two exchanges — two independent
+ * resting orders — doesn't dedupe across them.
  *
  * `tier` is PART of the key by design: a re-appearance at a DIFFERENT tier means the
  * order became more/less significant (moved toward/away from the spread) and IS worth
@@ -28,7 +31,7 @@ const lastAnnounced = new Map<string, number>();
 let lastPrune = 0;
 
 const keyOf = (n: Notification): string =>
-  `${n.symbol}:${n.market}:${n.side}:${n.price}:${n.tier}`;
+  `${n.exchange}:${n.symbol}:${n.market}:${n.side}:${n.price}:${n.tier}`;
 
 /**
  * Filter a flush's raw candidates (oldest→newest) down to those NOT announced within

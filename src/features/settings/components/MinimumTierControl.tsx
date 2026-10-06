@@ -1,17 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { TIER_COLORS } from '@/features/orderbook/tiers';
+import type { Tier } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '../notificationSettingsStore';
 
 /**
  * The 4-segment T1–T4 minimum-tier control (design template "Dashboard Page — Final",
  * Settings → Notifications). Only order-book levels at/above the picked tier are
- * surfaced as notifications. Tier 0 is not offered as a choice — it never notifies by
- * construction (see `selectNotifications`), so it would be a dead option.
+ * surfaced as notifications. The four segments are the full tier range (doc §3.5).
  *
  * The per-tier dot reuses `TIER_COLORS` from the order-book surface — the same shared
  * tier scale the cards and notification stripes use (exactly the cross-surface reuse
- * `tiers.ts` anticipated). Index 0 (no color) is skipped.
+ * `tiers.ts` anticipated).
  */
+const TIERS: readonly Tier[] = [1, 2, 3, 4];
+
 export function MinimumTierControl() {
   const { t } = useTranslation('settings');
   const minTier = useNotificationSettingsStore((s) => s.minTier);
@@ -34,9 +36,8 @@ export function MinimumTierControl() {
       </div>
 
       <div className="flex gap-2">
-        {TIER_COLORS.map((hex, i) => {
-          if (i === 0) return null; // tier 0 never notifies — not offered as a choice
-          const color = hex ?? 'var(--color-text-dim)';
+        {TIERS.map((i) => {
+          const color = TIER_COLORS[i] ?? 'var(--color-text-dim)';
           const active = i >= minTier;
           const isPivot = i === minTier;
           const border = isPivot

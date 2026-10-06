@@ -13,10 +13,17 @@ import {
   priceDecimals,
 } from '@/features/orderbook/format';
 import { barBackground } from '@/features/orderbook/tiers';
+import { EXCHANGES, exchangeRank } from '@/features/orderbook/exchanges';
+// The chrome/row-height constants behind this live in `masonry.ts` and must track the
+// Tailwind classes below (header, row padding, spread divider).
+import { estimateCardHeight } from '@/features/orderbook/masonry';
 
 /**
  * One live order book — design template "Orderbook", variant **1d** (notional /
  * price / distance columns, left-anchored histogram). One card per `(symbol, market)`.
+ *
+ * Rows from every exchange are merged into one price ladder per side; a leading
+ * logo column says which exchange each row came from (template `DashboardPage.dc.html`).
  *
  * Real-time architecture (CLAUDE.md): subscribes ONLY to its own `books[bookKey]`
  * slice, so a BTC store update never re-renders the ETH card. `content-visibility:
@@ -35,30 +42,46 @@ interface OrderbookCardProps {
 export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   const book = useOrderbookStore((s) => s.books[bookKey]);
 
-  // Book may vanish (DROP / snapshot shrink) between the parent's `keys` read and
+  // Pair may vanish (last venue removed / snapshot shrink) between the parent's `keys` read and
   // this render — the parent drops the card on the same store update, so render null.
   if (!book) return null;
 
-  // Bar scale: the max dollar notional across BOTH sides of this book. Always the
-  // dollar notional regardless of the display toggle — relative size shouldn't shift
-  // meaning when the unit label changes.
-  let maxNotional = 0;
-  for (const l of book.bids) maxNotional = Math.max(maxNotional, l.price * l.quantity);
-  for (const l of book.asks) maxNotional = Math.max(maxNotional, l.price * l.quantity);
+  // Merge every exchange's rows into one ladder per side (plan §3.6): rows are NOT
+  // grouped by exchange, each level already carries its own `exchange`.
+  const asks: Level[] = [];
+  const bids: Level[] = [];
+  for (const venue of Object.values(book.venues)) {
+    asks.push(...venue.asks);
+    bids.push(...venue.bids);
+  }
 
-  // Sort by price ourselves — do NOT trust the server's array order. Both sides are
-  // laid out high→low top-to-bottom (the standard ladder) so the nearest-spread orders
-  // hug the divider: the lowest ask sits immediately ABOVE it (the "5th" / bottom ask),
-  // and the highest bid sits immediately BELOW it (the "1st" / top bid).
-  const asks = [...book.asks].sort((a, b) => b.price - a.price);
-  const bids = [...book.bids].sort((a, b) => b.price - a.price);
+  // Bar scale: the max dollar notional across BOTH sides and ALL exchanges of this card.
+  // Always the dollar notional regardless of the display toggle — relative size shouldn't
+  // shift meaning when the unit label changes.
+  let maxNotional = 0;
+  for (const l of bids) maxNotional = Math.max(maxNotional, l.price * l.quantity);
+  for (const l of asks) maxNotional = Math.max(maxNotional, l.price * l.quantity);
+
+  // Sort by price ourselves — the server orders each side by importance, not price. Both
+  // sides are laid out high→low top-to-bottom (the standard ladder) so the nearest-spread
+  // orders hug the divider: the lowest ask sits immediately ABOVE it, and the highest bid
+  // sits immediately BELOW it. Equal prices on two exchanges tie-break by registry order
+  // (plan D5) so the rows don't swap places between ticks.
+  asks.sort(byPriceDesc);
+  bids.sort(byPriceDesc);
 
   const badge = marketBadge(book.market);
 
   return (
     <div
-      className="overflow-hidden rounded-[10px] border border-border bg-surface
-                 [content-visibility:auto] [contain-intrinsic-size:auto_380px]"
+      className="overflow-hidden rounded-[10px] border border-white/15 bg-surface
+                 transition-colors duration-[120ms] ease-[ease]
+                 hover:bg-[color-mix(in_oklab,var(--color-surface),white_4%)]
+                 [content-visibility:auto]"
+      // Placeholder size for a never-rendered off-screen card; once it has rendered, `auto`
+      // makes the browser reuse its last real size instead. Cards range from 1 row to 10+,
+      // so a fixed guess is wrong for most of them.
+      style={{ containIntrinsicSize: `auto ${estimateCardHeight(asks.length + bids.length)}px` }}
     >
       {/* Card header: market badge + symbol (mid price & column headers off) */}
       <div className="flex items-center gap-2.5 border-b border-border-subtle px-4 py-[11px]">
@@ -98,6 +121,9 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   );
 }
 
+const byPriceDesc = (a: Level, b: Level): number =>
+  b.price - a.price || exchangeRank(a.exchange) - exchangeRank(b.exchange);
+
 interface RowProps {
   level: Level;
   side: 'ask' | 'bid';
@@ -126,24 +152,36 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
       m: i18n.t('orderbook:card.age.m'),
       s: i18n.t('orderbook:card.age.s'),
     });
-    e.currentTarget.title = i18n.t('orderbook:card.firstSeen', { age });
+    e.currentTarget.title = `${EXCHANGES[level.exchange].label} · ${i18n.t('orderbook:card.firstSeen', { age })}`;
   };
 
   return (
     <div
-      className="relative grid grid-cols-[1fr_72px_56px] items-center gap-3 px-4 py-1
+      className="relative grid grid-cols-[12px_1fr_72px_56px] items-center gap-3 px-4 py-1
                  hover:bg-white/[0.04]"
       onMouseEnter={handleMouseEnter}
     >
-      {/* Bar layer, capped at the price column (right-[156px] = 72 + 56 + 2×12 gap + 4 slack) */}
-      <div className="absolute inset-y-0 left-0 right-[156px]">
+      {/* Exchange logo, outside the bar so it stays readable over any tier color. A row
+          swapping exchanges only swaps `src` between already-decoded images (plan §3.3). */}
+      <img
+        src={EXCHANGES[level.exchange].logo}
+        alt={EXCHANGES[level.exchange].label}
+        width={12}
+        height={12}
+        decoding="async"
+        className="block size-3 object-contain"
+      />
+
+      {/* Bar layer: starts after the logo column (left-9, from the template) and ends at the
+          price column's left edge (right-[156px] = 16 padding + 56 + 72 + 12 gap) */}
+      <div className="absolute inset-y-0 left-9 right-[156px]">
         <div
           className="absolute inset-y-0 left-0 transition-[width,background-color] duration-[120ms] ease-linear"
           style={{ width: `${pct}%`, background: barBackground(level.tier) }}
         />
       </div>
 
-      <span className="relative font-mono text-[12px] text-text-strong">
+      <span className="relative pl-1.5 font-mono text-[12px] text-text-strong">
         {sizeMode === 'usd' ? fmtMoney(notional) : fmtQty(level.quantity)}
       </span>
       <span

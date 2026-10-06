@@ -34,7 +34,7 @@ export function ClassificationRules({ open }: { open: boolean }) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [selected, setSelected] = useState<RuleTarget | null>(null);
 
-  const pool = useMemo(() => buildTickerPool(tickersQuery.data?.tickers), [tickersQuery.data]);
+  const pool = useMemo(() => buildTickerPool(tickersQuery.data?.instruments), [tickersQuery.data]);
 
   const customRules = customQuery.data ?? [];
   const customMap = useMemo(() => {

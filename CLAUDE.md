@@ -10,12 +10,58 @@ classified, and handles subscription access/payments. React 19 + TypeScript SPA 
 no SSR meta-framework.
 
 **Current state:** auth (register → verify-email → login → session bootstrap → route guards →
-logout), the live order book dashboard (WS feed → Zustand store → cards + sort menu + notifications
-panel + cooldown-deduped alerts), classification rules CRUD, client-side notification preferences
+logout), the live multi-exchange order book dashboard (WS feed → Zustand store → masonry of cards
+merging every exchange's rows + sort menu + notifications panel + cooldown-deduped alerts),
+classification rules CRUD, client-side notification preferences
 (minimum tier + muted tickers), the public landing page, and the full payment/monetization flow
 (plan catalog → checkout redirect → polling-based payment status → account page + billing history)
-are all built. Not yet started: charts. An i18n (English/Russian) rollout is designed but not
-implemented — see [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md).
+are all built, as is the English/Russian i18n layer (`react-i18next`, `src/lib/i18n/`; currently
+pinned to Russian via `FORCED_LOCALE`). Not yet started: charts.
+
+## Multi-exchange support
+
+The backend streams more than one exchange (Binance + MEXC Futures today; MEXC Spot and Bybit
+later), and the frontend handles that end to end. Don't reintroduce Binance-only assumptions.
+**The plan behind it (decisions D1–D8, store shape, the masonry deviation) is
+[`.claude/plans/multi-exchange-review.md`](.claude/plans/multi-exchange-review.md); read it before
+touching the order book, notifications or the Settings pickers.**
+
+The backend's revised (breaking) contracts live in [`.claude/docs/changes/`](.claude/docs/changes/).
+Each file there **supersedes** the same-named doc in `.claude/docs/`:
+
+- [`changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md): a protocol
+  rewrite, not a field addition. `ADD`/`UPDATE`/`DROP` are replaced by one `DEPTH` type in an
+  envelope `{ type, exchange, market, symbol, data }`, where `data: null` removes the book.
+  `SNAPSHOT.data` is an array of those same envelopes. Levels are **positional tuples**
+  `[price, quantity, tier, firstSeenMillis, distance]`, tiers are **1–4 only**, a side holds
+  **0–5** levels, `seq` is gone, and unknown `type`s must be ignored. `exchange` is an **open set**.
+- [`changes/ticker-list-api.md`](.claude/docs/changes/ticker-list-api.md): `GET /api/tickers`
+  returns `{ total, byVenue, instruments: [{ id, venue, symbol }] }`. `venue` is `EXCHANGE_MARKET`
+  (split on the **last** underscore); `id` is debug-only and must never be keyed on or stored.
+- [`changes/classification-rule-api.md`](.claude/docs/changes/classification-rule-api.md): no API
+  change. Rules stay **exchange-independent** (`(symbol, market)`), so the rule picker
+  de-duplicates the ticker pool by `(symbol, market)`.
+
+`symbol` is normalized `BASEQUOTE` on every exchange, in the feed, the ticker list and the rules
+API alike (confirmed with the backend; the ticker doc's "native spelling" note is outdated).
+
+Key decisions from the plan, in short:
+
+- **Card identity stays `(symbol, market)`** and `bookKey()` keeps its `SYMBOL:MARKET` format.
+  Exchanges nest inside a pair: `books[SYMBOL:MARKET].venues[EXCHANGE] = { bids, asks }`, and a
+  card merges the rows of all its venues, sorted by price, with an exchange logo per row (and on
+  every notification card).
+- **Mutes apply across all exchanges** and keep their `SYMBOL:MARKET` localStorage format, so no
+  migration is needed.
+- **The exchange registry is the allowlist**
+  ([`src/features/orderbook/exchanges.ts`](src/features/orderbook/exchanges.ts)): label + logo
+  (`src/assets/exchanges/*.png`) per exchange, and its order is the tie-break for equal prices.
+  The feed client drops envelopes for exchanges that aren't registered. Adding an exchange = one
+  asset + one registry line. The Settings ticker pool is deliberately *not* filtered by it.
+- **Notifications are per exchange**: the diff runs against that exchange's previous levels, and
+  `Notification` plus the cooldown key carry `exchange`. The panel search matches the exchange label.
+- **Masonry is reassigned only on reorder / column-count change**, never on a card's height change,
+  so cards don't hop columns per tick and the page keeps subscribing to `keys` only.
 
 ## Commands
 
@@ -79,11 +125,11 @@ WebSocket (feedClient.ts, module-level singleton)
     │  (a hidden-tab fallback timer covers throttled rAF)
     ▼
 useOrderbookStore (Zustand, OUTSIDE React) ──► React UI subscribes selectively
-    │  applyMessages() diffs each ADD/UPDATE       (only on-screen data re-renders;
-    │  against the PRE-overwrite book and           `DashboardPage` subscribes only to
-    │  returns raised notifications                 `keys`, each card only to its own
+    │  applyMessages() diffs each live DEPTH       (only on-screen data re-renders;
+    │  against that exchange's PRE-overwrite        `DashboardPage` subscribes only to
+    │  levels and returns raised notifications      `keys`, each card only to its own
     ▼                                                `books[key]` slice)
-cooldown.ts (dedup by symbol:market:side:price:tier, 5 min window)
+cooldown.ts (dedup by exchange:symbol:market:side:price:tier, 5 min window)
     ▼
 useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / NotificationHandle
 ```
@@ -188,20 +234,33 @@ public surface; nothing outside the feature reaches into its internals).
 
 ### Order book feature module (`src/features/orderbook/`)
 
-- **`types.ts`** — the wire data model (`OrderBook`, `Level`, `FeedMessage`, `Notification`) as
-  plain TS types, deliberately not Zod-validated (see above). `bookKey(symbol, market)` is the
-  single canonical way to key a book — always use it rather than hand-rolling the string.
+- **`types.ts`** — the data model (`PairBook` → `VenueBook` → `Level`, the decoded `FeedMessage`,
+  `Notification`) as plain TS types, deliberately not Zod-validated (see above).
+  `bookKey(symbol, market)` is the single canonical way to key a book — always use it rather than
+  hand-rolling the string. It keys a `(symbol, market)` *pair*; exchanges nest inside it (see
+  "Multi-exchange support" above). `Tier` is `1 | 2 | 3 | 4`; tier 0 no longer exists on the wire.
 - **`useOrderbookFeed.ts`** — the effect hook that starts/stops the module-level feed singleton for
   the component's lifetime; `startFeed`/`stopFeed` are idempotent so React StrictMode's
   mount→unmount→mount is safe.
-- **`notifications/selectNotifications.ts`** — pure diff function: given a book's previous state and
-  an incoming ADD/UPDATE, decides which levels are notification-worthy (tier 0 never notifies; a new
+- **`exchanges.ts`** — the exchange registry (label + logo) and the feed's allowlist; registry
+  order is the tie-break for equal prices across exchanges.
+- **`masonry.ts`** — pure column assignment for the dashboard grid: cards dealt in sort order to
+  the shortest column by an *estimated* height (rows × row height + chrome). `DashboardPage` holds
+  the column count (`ResizeObserver`) and keeps the sorted-keys identity stable across unchanged
+  orders, so a re-deal happens only on an actual reorder.
+- **`sortOrderbooks.ts`** — the sort-menu modes; `importance` ranks by tier counts summed across
+  every exchange of a pair.
+- **`notifications/selectNotifications.ts`** — pure diff function: given one exchange's previous
+  levels for a pair and an incoming `DEPTH`, decides which levels are notification-worthy (a new
   price or a tier change does).
 - **`notifications/cooldown.ts`** — module-level (outside Zustand) dedup map keyed by
-  `symbol:market:side:price:tier`, 5-minute window, so top-5-window churn doesn't spam repeat
+  `exchange:symbol:market:side:price:tier`, 5-minute window, so top-5-window churn doesn't spam repeat
   alerts for the same resting order.
-- **`tiers.ts`** — the tier→color scale shared by order book bars and notification stripes; these
-  are data-viz values for this surface, not design-system theme tokens.
+- **`notifications/notificationSearch.ts`** — the panel's substring search over exchange label,
+  ticker, side, market and both raw and formatted numbers.
+- **`tiers.ts`** — the tier→color scale (indexed by tier, index 0 an unused placeholder) shared by
+  order book bars, notification stripes and the Settings minimum-tier control; these are data-viz
+  values for this surface, not design-system theme tokens.
 - Components (`DashboardHeader`, `OrderbookCard`, `NotificationPanel`, `NotificationHandle`,
   `NotificationCard`) are conventional React reading from the stores via selectors — see
   `DashboardPage.tsx` for how the page composes them.
@@ -257,14 +316,18 @@ dashboard header, not a routed page):
   to filter which notifications get raised — same outside-React shape as `session.ts` and
   `orderbookStore.ts`.
 
+Both pickers (muted tickers, rule search) draw from one pool, `tickerPool.ts`, built from
+`GET /api/tickers` (`schemas.ts`): `parseVenue()` splits each instrument's `EXCHANGE_MARKET` venue,
+and the pool is de-duplicated by `(symbol, market)` since rules and mutes are exchange-independent.
+
 ## Features (high-level landscape)
 
 1. **Auth** — ✅ built. Register/verify/login/session/logout.
 2. **Order book** — ✅ built (flagship, performance-critical). Live, continuously-updated order
-   books; detects meaningful changes (new/removed significant orders) and surfaces them as
+   books merged across exchanges (Binance + MEXC today); detects meaningful changes (new/removed significant orders) and surfaces them as
    notifications, with a sort menu and per-user mute/tier filtering (see Settings below). Spoken/TTS
    alerts are not yet implemented. Governed by the real-time architecture above. Socket protocol:
-   [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md).
+   [`.claude/docs/changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md).
 3. **Classification rules** — ✅ built. Per-user CRUD for the tier thresholds that drive how order
    book levels are ranked/highlighted. Conventional forms-and-data work validated against backend
    rules (client-side mirror in `rulesValidation.ts`).
@@ -273,16 +336,17 @@ dashboard header, not a routed page):
    access **gate itself is advisory-only client-side** — the backend doesn't yet enforce entitlement
    on REST/WS, per `monetization-api.md` §4.2.
 5. **Charts** — future work, most likely built on TradingView Lightweight Charts. Not yet scoped.
-6. **i18n (English/Russian)** — designed, not implemented. `react-i18next`, browser-language
-   detection, feature-mirrored namespaces. Full inventory + rollout phasing in
-   [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md) before starting any
-   extraction work.
+6. **i18n (English/Russian)** — ✅ built. `react-i18next` in `src/lib/i18n/`, feature-mirrored
+   namespaces (`locales/{en,ru}/<namespace>.json`). Browser-language detection exists but is
+   currently disabled: `FORCED_LOCALE` in `config.ts` pins the app to Russian. Design rationale in
+   [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md).
 
 ## Reference docs
 
 - [`.claude/docs/auth-api.md`](.claude/docs/auth-api.md) — full auth API contract.
 - [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md) — the `/ws` socket
-  protocol: connection, token-as-query-param, every message type and payload shape.
+  protocol: connection, token-as-query-param, every message type and payload shape. Its message
+  format is **superseded** by [`changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md).
 - [`.claude/docs/classification-rule-api.md`](.claude/docs/classification-rule-api.md) — the tier
   model (notional × distance thresholds) and the per-user custom-rule CRUD contract.
 - [`.claude/docs/monetization-api.md`](.claude/docs/monetization-api.md) — endpoint-level contract
@@ -292,14 +356,17 @@ dashboard header, not a routed page):
   negative-path table (cancelled/lost/retried payments).
 - [`.claude/docs/billing-history-api.md`](.claude/docs/billing-history-api.md) — order history and
   entitlement-ledger endpoints backing `BillingHistoryPage`.
+- [`.claude/docs/changes/`](.claude/docs/changes/) — the backend's revised multi-exchange contracts
+  (WebSocket feed, ticker list, classification rules). Each file supersedes the same-named doc
+  above. See "Multi-exchange support".
 - [`.claude/docs/frontend-architecture.md`](.claude/docs/frontend-architecture.md) — the high-level
   "what and why" of the frontend direction (a proposed default, not a locked mandate).
 - [`.claude/docs/landing-page.md`](.claude/docs/landing-page.md) — how the public landing page +
   billing data layer are built: module shape, routing, the plans data flow, and design-token usage.
 - [`.claude/plans/`](.claude/plans/) — phase-by-phase implementation plans for each feature as it
   was built; useful for the *why* behind a design decision that isn't obvious from the code alone.
-  [`.claude/plans/i18n-localization.md`](.claude/plans/i18n-localization.md) is a proposed plan, not
-  a build log — nothing in it is implemented yet.
+  [`.claude/plans/multi-exchange-review.md`](.claude/plans/multi-exchange-review.md) is the
+  plan the multi-exchange support was built from.
 
 ## Working conventions
 

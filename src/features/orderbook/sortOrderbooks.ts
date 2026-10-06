@@ -1,5 +1,5 @@
 import type { ParseKeys } from 'i18next';
-import type { BookKey, Market, OrderBook } from '@/features/orderbook/types';
+import type { BookKey, Market, PairBook } from '@/features/orderbook/types';
 
 export type SortMode = 'importance' | 'alphabetical' | 'spot-first' | 'futures-first';
 
@@ -21,16 +21,18 @@ function marketOf(key: BookKey): Market {
   return key.slice(key.lastIndexOf(':') + 1) as Market;
 }
 
-/** Count of levels (bids + asks) per tier; index 0 unused — tier 0 never counts as "important". */
-function tierCounts(book: OrderBook): number[] {
+/** Count of levels (bids + asks, across every exchange of the pair) per tier; index 0 unused. */
+function tierCounts(book: PairBook): number[] {
   const counts = [0, 0, 0, 0, 0];
-  for (const level of book.bids) counts[level.tier]++;
-  for (const level of book.asks) counts[level.tier]++;
+  for (const venue of Object.values(book.venues)) {
+    for (const level of venue.bids) counts[level.tier]++;
+    for (const level of venue.asks) counts[level.tier]++;
+  }
   return counts;
 }
 
 /** More tier-4 orders always outranks any amount of tier-3 (and so on down to tier-1). */
-function compareImportance(a: OrderBook, b: OrderBook): number {
+function compareImportance(a: PairBook, b: PairBook): number {
   const ca = tierCounts(a);
   const cb = tierCounts(b);
   for (let tier = 4; tier >= 1; tier--) {
@@ -50,7 +52,7 @@ function compareImportance(a: OrderBook, b: OrderBook): number {
  */
 export function sortKeys(
   keys: BookKey[],
-  books: Record<BookKey, OrderBook> | undefined,
+  books: Record<BookKey, PairBook> | undefined,
   mode: SortMode,
 ): BookKey[] {
   switch (mode) {
