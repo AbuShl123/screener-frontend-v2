@@ -13,11 +13,14 @@ import {
   priceDecimals,
 } from '@/features/orderbook/format';
 import { barBackground } from '@/features/orderbook/tiers';
-import { exchangeRank } from '@/features/orderbook/exchanges';
+import { EXCHANGES, exchangeRank } from '@/features/orderbook/exchanges';
 
 /**
  * One live order book — design template "Orderbook", variant **1d** (notional /
  * price / distance columns, left-anchored histogram). One card per `(symbol, market)`.
+ *
+ * Rows from every exchange are merged into one price ladder per side; a leading
+ * logo column says which exchange each row came from (template `DashboardPage.dc.html`).
  *
  * Real-time architecture (CLAUDE.md): subscribes ONLY to its own `books[bookKey]`
  * slice, so a BTC store update never re-renders the ETH card. `content-visibility:
@@ -68,8 +71,14 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
 
   return (
     <div
-      className="overflow-hidden rounded-[10px] border border-border bg-surface
-                 [content-visibility:auto] [contain-intrinsic-size:auto_380px]"
+      className="overflow-hidden rounded-[10px] border border-white/15 bg-surface
+                 transition-colors duration-[120ms] ease-[ease]
+                 hover:bg-[color-mix(in_oklab,var(--color-surface),white_4%)]
+                 [content-visibility:auto]"
+      // Placeholder size for a never-rendered off-screen card; once it has rendered, `auto`
+      // makes the browser reuse its last real size instead. Cards range from 1 row to 10+,
+      // so a fixed guess is wrong for most of them.
+      style={{ containIntrinsicSize: `auto ${estimateCardHeight(asks.length + bids.length)}px` }}
     >
       {/* Card header: market badge + symbol (mid price & column headers off) */}
       <div className="flex items-center gap-2.5 border-b border-border-subtle px-4 py-[11px]">
@@ -109,6 +118,14 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   );
 }
 
+// Card chrome (header 42 + rows padding 20 + spread divider 15 + borders 2) plus 26px per
+// row (py-1 + 18px line). Kept in step with the Tailwind classes below.
+const CARD_CHROME_PX = 80;
+const ROW_PX = 26;
+
+/** Rendered height of a card with `rows` levels across both sides, to within a pixel or two. */
+const estimateCardHeight = (rows: number): number => CARD_CHROME_PX + rows * ROW_PX;
+
 const byPriceDesc = (a: Level, b: Level): number =>
   b.price - a.price || exchangeRank(a.exchange) - exchangeRank(b.exchange);
 
@@ -140,24 +157,36 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
       m: i18n.t('orderbook:card.age.m'),
       s: i18n.t('orderbook:card.age.s'),
     });
-    e.currentTarget.title = i18n.t('orderbook:card.firstSeen', { age });
+    e.currentTarget.title = `${EXCHANGES[level.exchange].label} · ${i18n.t('orderbook:card.firstSeen', { age })}`;
   };
 
   return (
     <div
-      className="relative grid grid-cols-[1fr_72px_56px] items-center gap-3 px-4 py-1
+      className="relative grid grid-cols-[12px_1fr_72px_56px] items-center gap-3 px-4 py-1
                  hover:bg-white/[0.04]"
       onMouseEnter={handleMouseEnter}
     >
-      {/* Bar layer, capped at the price column (right-[156px] = 72 + 56 + 2×12 gap + 4 slack) */}
-      <div className="absolute inset-y-0 left-0 right-[156px]">
+      {/* Exchange logo, outside the bar so it stays readable over any tier color. A row
+          swapping exchanges only swaps `src` between already-decoded images (plan §3.3). */}
+      <img
+        src={EXCHANGES[level.exchange].logo}
+        alt={EXCHANGES[level.exchange].label}
+        width={12}
+        height={12}
+        decoding="async"
+        className="block size-3 object-contain"
+      />
+
+      {/* Bar layer: starts after the logo column (left-9, from the template) and ends at the
+          price column's left edge (right-[156px] = 16 padding + 56 + 72 + 12 gap) */}
+      <div className="absolute inset-y-0 left-9 right-[156px]">
         <div
           className="absolute inset-y-0 left-0 transition-[width,background-color] duration-[120ms] ease-linear"
           style={{ width: `${pct}%`, background: barBackground(level.tier) }}
         />
       </div>
 
-      <span className="relative font-mono text-[12px] text-text-strong">
+      <span className="relative pl-1.5 font-mono text-[12px] text-text-strong">
         {sizeMode === 'usd' ? fmtMoney(notional) : fmtQty(level.quantity)}
       </span>
       <span
