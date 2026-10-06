@@ -204,6 +204,18 @@ Performance-safe adaptation (D6):
 - The notification panel's `paddingRight` on `<main>` already shrinks the container, so the
   `ResizeObserver` naturally drops a column when the panel opens.
 
+**As implemented (deviation):** memoizing on `[sortedKeys, colCount]` alone was not enough.
+In `importance` mode the page already re-renders on every flush, and `sortKeys` returns a fresh
+array each time even when the order is unchanged, so the memo would have re-dealt the columns
+per tick (breaking D6). `DashboardPage` therefore keeps the previous `sortedKeys` identity (via a
+ref) while the order is element-wise identical, so a re-deal happens only on an actual reorder.
+In importance mode real reorders can still be fairly frequent (tier counts shift), and a card
+moved to another column remounts; that is accepted. Two smaller details: the card-height
+estimate uses the card's actual chrome (`80 + rows × 26`, shared between `masonry.ts` and the
+card's `contain-intrinsic-size`) rather than the template's `64 + rows × 26`, and the
+`ResizeObserver` watches an always-mounted wrapper inside `<main>` so the column count is
+measured before the first card arrives.
+
 ### 3.5 Notifications
 
 - `selectNotifications(prevVenue, msg)` diffs **one exchange's** previous levels against the

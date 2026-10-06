@@ -14,6 +14,9 @@ import {
 } from '@/features/orderbook/format';
 import { barBackground } from '@/features/orderbook/tiers';
 import { EXCHANGES, exchangeRank } from '@/features/orderbook/exchanges';
+// The chrome/row-height constants behind this live in `masonry.ts` and must track the
+// Tailwind classes below (header, row padding, spread divider).
+import { estimateCardHeight } from '@/features/orderbook/masonry';
 
 /**
  * One live order book — design template "Orderbook", variant **1d** (notional /
@@ -117,14 +120,6 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
     </div>
   );
 }
-
-// Card chrome (header 42 + rows padding 20 + spread divider 15 + borders 2) plus 26px per
-// row (py-1 + 18px line). Kept in step with the Tailwind classes below.
-const CARD_CHROME_PX = 80;
-const ROW_PX = 26;
-
-/** Rendered height of a card with `rows` levels across both sides, to within a pixel or two. */
-const estimateCardHeight = (rows: number): number => CARD_CHROME_PX + rows * ROW_PX;
 
 const byPriceDesc = (a: Level, b: Level): number =>
   b.price - a.price || exchangeRank(a.exchange) - exchangeRank(b.exchange);
