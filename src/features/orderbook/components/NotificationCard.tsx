@@ -8,6 +8,7 @@ import {
   marketBadge,
   priceDecimals,
 } from '@/features/orderbook/format';
+import { EXCHANGES } from '@/features/orderbook/exchanges';
 import { TIER_COLORS } from '@/features/orderbook/tiers';
 import type { Notification } from '@/features/orderbook/types';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
@@ -19,7 +20,7 @@ interface NotificationCardProps {
 
 /**
  * One notification, mirroring the template's item: a solid tier stripe down the left
- * edge, a header row (symbol + market badge + side / time), and a 3-column metrics grid
+ * edge, a header row (exchange logo + symbol + market badge + side / time), and a 3-column metrics grid
  * (PRICE / NOTIONAL·SIZE / DIST). The middle metric follows the header's QTY/$ toggle,
  * exactly like [`OrderbookCard`]. The stripe uses full tier color (no opacity mix — the
  * template stripe is solid, unlike the row bars).
@@ -27,6 +28,7 @@ interface NotificationCardProps {
 export function NotificationCard({ notification: n, sizeMode }: NotificationCardProps) {
   const { t } = useTranslation('orderbook');
   const badge = marketBadge(n.market);
+  const exchange = EXCHANGES[n.exchange];
   const isUsd = sizeMode === 'usd';
 
   return (
@@ -38,9 +40,18 @@ export function NotificationCard({ notification: n, sizeMode }: NotificationCard
       />
 
       <div className="flex flex-col gap-[11px] pt-3 pr-[14px] pb-[13px] pl-[17px]">
-        {/* Row 1: symbol + market badge + side  /  time */}
+        {/* Row 1: exchange logo + symbol + market badge + side  /  time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-[9px]">
+            <img
+              src={exchange.logo}
+              alt={exchange.label}
+              title={exchange.label}
+              width={14}
+              height={14}
+              decoding="async"
+              className="block size-3.5 flex-none object-contain"
+            />
             <span className="font-mono text-[14px] tracking-[0.02em] text-text-strong">
               {fmtSymbol(n.symbol)}
             </span>

@@ -5,6 +5,7 @@ import {
   fmtSymbol,
   priceDecimals,
 } from '@/features/orderbook/format';
+import { EXCHANGES } from '@/features/orderbook/exchanges';
 import type { Notification } from '@/features/orderbook/types';
 
 /**
@@ -15,6 +16,7 @@ import type { Notification } from '@/features/orderbook/types';
 function haystack(n: Notification): string {
   const qty = n.notional / n.price;
   return [
+    EXCHANGES[n.exchange].label, //               'MEXC'     → matches "mexc"
     n.symbol, //                                 'XRPUSDT'  → matches "xrp", "usdt"
     fmtSymbol(n.symbol), //                       'XRP/USDT'
     n.side, //                                    'ask' / 'bid'
@@ -29,7 +31,7 @@ function haystack(n: Notification): string {
     .toLowerCase();
 }
 
-/** Substring match across ticker + price + notional + distance (+ side/market). */
+/** Substring match across exchange + ticker + price + notional + distance (+ side/market). */
 export function matches(n: Notification, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
