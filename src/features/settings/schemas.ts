@@ -3,25 +3,24 @@ import type { Market } from '@/features/orderbook/types';
 
 /**
  * Zod validation for `GET /api/tickers` (REST → validated, per CLAUDE.md). Shape per
- * [`.claude/docs/classification-rule-api.md`](../../../.claude/docs/classification-rule-api.md)
- * "Fetching the Active Ticker List". These schemas are both the runtime validator and
- * the TS type source.
+ * [`.claude/docs/changes/ticker-list-api.md`](../../../.claude/docs/changes/ticker-list-api.md)
+ * §5: one row per `(venue, symbol)` instrument. These schemas are both the runtime
+ * validator and the TS type source.
  */
 
-export const tickerSchema = z.object({
-  symbol: z.string(),
-  hasFutures: z.boolean(),
-  hasSpot: z.boolean(),
+export const instrumentSchema = z.object({
+  id: z.number(), // debug only (process-local, reassigned on restart): never read, key on or store
+  venue: z.string(), // `EXCHANGE_MARKET`, e.g. "BINANCE_SPOT"; open set
+  symbol: z.string(), // normalized BASEQUOTE on every exchange
 });
 
 export const tickersResponseSchema = z.object({
   total: z.number(),
-  spotCount: z.number(),
-  futuresCount: z.number(),
-  tickers: z.array(tickerSchema),
+  byVenue: z.record(z.string(), z.number()),
+  instruments: z.array(instrumentSchema),
 });
 
-export type Ticker = z.infer<typeof tickerSchema>;
+export type Instrument = z.infer<typeof instrumentSchema>;
 export type TickersResponse = z.infer<typeof tickersResponseSchema>;
 
 /**

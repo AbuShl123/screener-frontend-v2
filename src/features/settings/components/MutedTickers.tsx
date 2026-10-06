@@ -24,8 +24,8 @@ export function MutedTickers({ open }: { open: boolean }) {
   const tickersQuery = useTickers(open);
   const [query, setQuery] = useState('');
 
-  // Ticker pool: a FUTURES row for every ticker (always tracked) + a SPOT row iff hasSpot.
-  const pool = useMemo(() => buildTickerPool(tickersQuery.data?.tickers), [tickersQuery.data]);
+  // Ticker pool: one entry per tracked (symbol, market) pair, de-duplicated across exchanges.
+  const pool = useMemo(() => buildTickerPool(tickersQuery.data?.instruments), [tickersQuery.data]);
 
   const trimmed = query.trim().toUpperCase();
   const mutedSet = useMemo(() => new Set(muted), [muted]);
