@@ -15,7 +15,7 @@ const KEYS = {
 } as const;
 
 export interface StoredSettings {
-  minTier: number; // 1–4 (tier 0 is not an offered choice — it never notifies)
+  minTier: number; // 1–4, the full tier range (doc §3.5: tier 0 does not exist)
   muted: string[]; // bookKey(symbol, market) values
 }
 

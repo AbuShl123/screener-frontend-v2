@@ -1,6 +1,6 @@
 # Multi-exchange support: impact review & phased plan
 
-> **Status:** agreed plan, not yet implemented. Branch: `feature/multi-exchange`.
+> **Status:** implemented (Phases 0–6). Branch: `feature/multi-exchange`.
 > **Trigger:** the backend added a second exchange (MEXC Futures; MEXC Spot soon, Bybit later),
 > which changed the WebSocket feed and `GET /api/tickers` contracts.
 > **Contracts:** [`../docs/changes/websocket-feed-api.md`](../docs/changes/websocket-feed-api.md),
