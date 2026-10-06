@@ -13,6 +13,7 @@ import {
   priceDecimals,
 } from '@/features/orderbook/format';
 import { barBackground } from '@/features/orderbook/tiers';
+import { exchangeRank } from '@/features/orderbook/exchanges';
 
 /**
  * One live order book — design template "Orderbook", variant **1d** (notional /
@@ -35,23 +36,33 @@ interface OrderbookCardProps {
 export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   const book = useOrderbookStore((s) => s.books[bookKey]);
 
-  // Book may vanish (DROP / snapshot shrink) between the parent's `keys` read and
+  // Pair may vanish (last venue removed / snapshot shrink) between the parent's `keys` read and
   // this render — the parent drops the card on the same store update, so render null.
   if (!book) return null;
 
-  // Bar scale: the max dollar notional across BOTH sides of this book. Always the
-  // dollar notional regardless of the display toggle — relative size shouldn't shift
-  // meaning when the unit label changes.
-  let maxNotional = 0;
-  for (const l of book.bids) maxNotional = Math.max(maxNotional, l.price * l.quantity);
-  for (const l of book.asks) maxNotional = Math.max(maxNotional, l.price * l.quantity);
+  // Merge every exchange's rows into one ladder per side (plan §3.6): rows are NOT
+  // grouped by exchange, each level already carries its own `exchange`.
+  const asks: Level[] = [];
+  const bids: Level[] = [];
+  for (const venue of Object.values(book.venues)) {
+    asks.push(...venue.asks);
+    bids.push(...venue.bids);
+  }
 
-  // Sort by price ourselves — do NOT trust the server's array order. Both sides are
-  // laid out high→low top-to-bottom (the standard ladder) so the nearest-spread orders
-  // hug the divider: the lowest ask sits immediately ABOVE it (the "5th" / bottom ask),
-  // and the highest bid sits immediately BELOW it (the "1st" / top bid).
-  const asks = [...book.asks].sort((a, b) => b.price - a.price);
-  const bids = [...book.bids].sort((a, b) => b.price - a.price);
+  // Bar scale: the max dollar notional across BOTH sides and ALL exchanges of this card.
+  // Always the dollar notional regardless of the display toggle — relative size shouldn't
+  // shift meaning when the unit label changes.
+  let maxNotional = 0;
+  for (const l of bids) maxNotional = Math.max(maxNotional, l.price * l.quantity);
+  for (const l of asks) maxNotional = Math.max(maxNotional, l.price * l.quantity);
+
+  // Sort by price ourselves — the server orders each side by importance, not price. Both
+  // sides are laid out high→low top-to-bottom (the standard ladder) so the nearest-spread
+  // orders hug the divider: the lowest ask sits immediately ABOVE it, and the highest bid
+  // sits immediately BELOW it. Equal prices on two exchanges tie-break by registry order
+  // (plan D5) so the rows don't swap places between ticks.
+  asks.sort(byPriceDesc);
+  bids.sort(byPriceDesc);
 
   const badge = marketBadge(book.market);
 
@@ -97,6 +108,9 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
     </div>
   );
 }
+
+const byPriceDesc = (a: Level, b: Level): number =>
+  b.price - a.price || exchangeRank(a.exchange) - exchangeRank(b.exchange);
 
 interface RowProps {
   level: Level;

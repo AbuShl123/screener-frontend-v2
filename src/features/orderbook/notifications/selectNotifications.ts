@@ -1,27 +1,27 @@
-import type { Level, Notification, OrderBook } from '@/features/orderbook/types';
+import type { DepthMessage, Level, Notification, VenueBook } from '@/features/orderbook/types';
 
 let counter = 0; // module-local monotonic id source (stable React keys, one card per event)
 
-/** The ADD/UPDATE shape applyMessages passes in (symbol/market + both level arrays). */
-interface AddUpdate {
-  symbol: string;
-  market: OrderBook['market'];
-  bids: Level[];
-  asks: Level[];
-}
+/** The book identity a raised notification carries. */
+type Identity = Pick<DepthMessage, 'exchange' | 'symbol' | 'market'>;
 
 /**
- * Candidates raised by ONE ADD/UPDATE message, diffed against the book's PREVIOUS levels.
- * `prev` is the stored book BEFORE this message overwrites it (undefined = brand-new book).
+ * Candidates raised by ONE live `DEPTH` message for ONE exchange's book, diffed against
+ * that exchange's PREVIOUS levels (plan §3.5). `prev` is the stored venue BEFORE this
+ * message overwrites it (undefined = the exchange's book is new to the pair).
  *
- * Pure and side-effect-free apart from the module-local `counter` (id source). SNAPSHOT
- * and DROP never reach here — the caller only invokes this on ADD/UPDATE — so the initial
- * snapshot and every reconnect snapshot raise nothing (plan §3).
+ * Pure and side-effect-free apart from the module-local `counter` (id source). Snapshot
+ * entries and `data: null` removals never reach here — the store only invokes this for
+ * live upserts — so the initial snapshot and every reconnect snapshot raise nothing.
  */
-export function selectNotifications(prev: OrderBook | undefined, msg: AddUpdate): Notification[] {
+export function selectNotifications(
+  prev: VenueBook | undefined,
+  id: Identity,
+  next: VenueBook,
+): Notification[] {
   const out: Notification[] = [];
-  scanSide(out, prev?.bids, msg.bids, 'bid', msg);
-  scanSide(out, prev?.asks, msg.asks, 'ask', msg);
+  scanSide(out, prev?.bids, next.bids, 'bid', id);
+  scanSide(out, prev?.asks, next.asks, 'ask', id);
   return out;
 }
 
@@ -30,14 +30,12 @@ function scanSide(
   prevLevels: Level[] | undefined,
   nextLevels: Level[],
   side: 'bid' | 'ask',
-  msg: AddUpdate,
+  id: Identity,
 ): void {
   for (const level of nextLevels) {
-    if (level.tier === 0) continue; // (a) tier 0 → never notify
-
-    // (b) no existing book for this ticker → every non-zero level qualifies.
-    // (c) existing book but no level at this price → qualifies.
-    // (d) existing level at this price → qualifies ONLY if the tier changed.
+    // (a) no previous book for this exchange → every level qualifies.
+    // (b) previous book but no level at this price → qualifies.
+    // (c) previous level at this price → qualifies ONLY if the tier changed.
     if (prevLevels) {
       // Float `===` is correct here: a retained level keeps its identical server-sent
       // price across updates, so it matches; a genuinely new price is a different number.
@@ -47,12 +45,13 @@ function scanSide(
 
     out.push({
       id: `n${++counter}`,
-      symbol: msg.symbol,
-      market: msg.market,
+      exchange: id.exchange,
+      symbol: id.symbol,
+      market: id.market,
       side,
       price: level.price,
       notional: level.price * level.quantity, // $ notional (base for $ and QTY display)
-      tier: level.tier as 1 | 2 | 3 | 4, // tier 0 already excluded above
+      tier: level.tier,
       distance: level.distance,
       timeMillis: Date.now(), // detection time (see plan §2)
     });
