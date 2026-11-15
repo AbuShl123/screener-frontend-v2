@@ -1,5 +1,6 @@
 import binanceLogo from '@/assets/exchanges/binance.png';
 import mexcLogo from '@/assets/exchanges/mexc.png';
+import bybitLogo from '@/assets/exchanges/bybit.png';
 
 /**
  * The exchange registry: display metadata per exchange AND the feed's allowlist (plan D4).
@@ -21,6 +22,7 @@ export interface ExchangeMeta {
 export const EXCHANGES = {
   BINANCE: { label: 'Binance', logo: binanceLogo },
   MEXC: { label: 'MEXC', logo: mexcLogo },
+  BYBIT: { label: 'Bybit', logo: bybitLogo },
 } satisfies Record<string, ExchangeMeta>;
 
 export type Exchange = keyof typeof EXCHANGES;

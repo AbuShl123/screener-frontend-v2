@@ -20,8 +20,8 @@ pinned to Russian via `FORCED_LOCALE`). Not yet started: charts.
 
 ## Multi-exchange support
 
-The backend streams more than one exchange (Binance + MEXC Futures today; MEXC Spot and Bybit
-later), and the frontend handles that end to end. Don't reintroduce Binance-only assumptions.
+The backend streams more than one exchange (Binance + MEXC Futures today, Bybit registered ahead of
+its backend rollout; MEXC Spot later), and the frontend handles that end to end. Don't reintroduce Binance-only assumptions.
 **The plan behind it (decisions D1–D8, store shape, the masonry deviation) is
 [`.claude/plans/multi-exchange-review.md`](.claude/plans/multi-exchange-review.md); read it before
 touching the order book, notifications or the Settings pickers.**
