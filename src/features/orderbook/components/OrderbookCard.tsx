@@ -157,7 +157,7 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
 
   return (
     <div
-      className="relative grid grid-cols-[12px_1fr_72px_56px] items-center gap-3 px-4 py-1
+      className="relative grid grid-cols-[16px_1fr_72px_56px] items-center gap-3 px-4 py-1
                  hover:bg-white/[0.04]"
       onMouseEnter={handleMouseEnter}
     >
@@ -166,15 +166,15 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
       <img
         src={EXCHANGES[level.exchange].logo}
         alt={EXCHANGES[level.exchange].label}
-        width={12}
-        height={12}
+        width={16}
+        height={16}
         decoding="async"
-        className="block size-3 object-contain"
+        className="block size-4 object-contain"
       />
 
-      {/* Bar layer: starts after the logo column (left-9, from the template) and ends at the
+      {/* Bar layer: starts after the logo column (left-[44px] = 16 padding + 16 logo + 12 gap) and ends at the
           price column's left edge (right-[156px] = 16 padding + 56 + 72 + 12 gap) */}
-      <div className="absolute inset-y-0 left-9 right-[156px]">
+      <div className="absolute inset-y-0 left-[44px] right-[156px]">
         <div
           className="absolute inset-y-0 left-0 transition-[width,background-color] duration-[120ms] ease-linear"
           style={{ width: `${pct}%`, background: barBackground(level.tier) }}
