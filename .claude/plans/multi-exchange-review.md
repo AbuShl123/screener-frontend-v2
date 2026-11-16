@@ -65,7 +65,7 @@ consequence is that the rule picker must de-duplicate the ticker pool by `(symbo
 | D1 | **Card identity stays `(symbol, market)`; exchanges are nested inside it** (§3.1). | Matches the template (merged rows), keeps `keys` stable and per-card selectors unchanged, and preserves the `SYMBOL:MARKET` key. |
 | D2 | **No frontend row cap.** A side shows every level from every exchange (≤ 5 per exchange per side, so ≤ 10 with two exchanges, ≤ 15 with Bybit). | The backend already caps per exchange. Revisit only if it becomes a problem. |
 | D3 | **Mutes apply across all exchanges.** Keyed `SYMBOL:MARKET`, exactly as today. | Mirrors how rules work. **No localStorage migration needed**: existing mutes stay valid. |
-| D4 | **An exchange registry is the allowlist.** Envelopes for an exchange not in the registry are dropped in the feed client's guard. | "Frontend not yet updated for a new exchange" degrades to "that exchange is invisible", never to a broken row with no logo. |
+| D4 | ~~**An exchange registry is the allowlist.** Envelopes for an exchange not in the registry are dropped in the feed client's guard.~~ **Superseded (2026-11-17):** the registry is now backend-driven (`GET /api/exchanges`, [`../docs/changes/exchange-metadata-api.md`](../docs/changes/exchange-metadata-api.md)). The feed accepts an unregistered exchange whose id matches `^[A-Z0-9]{1,32}$` (max 32 exchanges) as a temporary *provisional* entry that triggers a throttled metadata refetch; unknown exchanges get a letter-fallback logo. See CLAUDE.md "Multi-exchange support". | ~~"Frontend not yet updated for a new exchange" degrades to "that exchange is invisible", never to a broken row with no logo.~~ New backend exchanges must appear without a frontend release. |
 | D5 | **Equal prices across exchanges order by registry order** (Binance, then MEXC, then …). | Deterministic, no flicker between two rows with the same price. |
 | D6 | **Masonry assignment is recomputed only on reorder/resize, not on height change** (§3.4). | Cards don't hop between columns on every tick; the page keeps its "subscribe to `keys` only" property. Columns may drift slightly out of balance between reorders, which is acceptable. |
 | D7 | **Logos are static PNG assets imported through Vite, rendered with `<img>`.** Assumed already sized/normalized (§3.3). | Format is not the bottleneck; dimensions and rendering method are. |
@@ -347,3 +347,19 @@ Each phase ends with `npm run typecheck` passing; the user tests manually.
   is intended (§3.8).
 - **Row count per side** can reach 15 once Bybit lands. No cap for now (D2); the masonry height
   estimate already scales with row count.
+
+## 7. Addendum: US4 layout stabilization (refines D6)
+
+- **Stable re-deal.** The greedy shortest-column deal is order-sensitive: one swap near the top
+  cascaded every later card into a new column (and remounted it), which under live importance
+  sorting was the main source of jumping. `assignColumnsStable` keeps each card in its previous
+  column and only re-orders within it; new/orphaned cards go to the shortest column. It falls back
+  to a fresh deal when its imbalance exceeds a fresh deal's by `REBALANCE_SLACK_PX` (this also
+  covers a column-count increase). A sort-mode change always re-deals fresh so the new order
+  reads left-to-right. Trade-off: the first row is only approximately the top-N in reading order.
+- **No sort timer.** With the cascade gone, an importance reorder moves a card within its own
+  column immediately; a 3–5 s timer would delay that by up to its period and was not added.
+- **No fixed-height placeholders.** Reserving 10 rows/side would make most cards mostly empty.
+  Instead the card holds a delayed-shrink `minHeight` (grows at once, shrinks after 10 s below).
+- **Row keys** are `exchange:price` instead of positional, so bar transitions follow the order.
+- The reconnecting notice is a fixed overlay; below `lg` the notification panel overlays the grid.

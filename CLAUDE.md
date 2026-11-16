@@ -11,17 +11,21 @@ no SSR meta-framework.
 
 **Current state:** auth (register → verify-email → login → session bootstrap → route guards →
 logout), the live multi-exchange order book dashboard (WS feed → Zustand store → masonry of cards
-merging every exchange's rows + sort menu + notifications panel + cooldown-deduped alerts),
-classification rules CRUD, client-side notification preferences
-(minimum tier + muted tickers), the public landing page, and the full payment/monetization flow
-(plan catalog → checkout redirect → polling-based payment status → account page + billing history)
-are all built, as is the English/Russian i18n layer (`react-i18next`, `src/lib/i18n/`; currently
-pinned to Russian via `FORCED_LOCALE`). Not yet started: charts.
+merging every exchange's rows + sort menu + per-exchange filter + notifications panel +
+cooldown-deduped alerts), the backend-driven exchange registry (`GET /api/exchanges`),
+classification rules CRUD, client-side notification preferences (minimum tier + muted tickers +
+muted exchange/market venues), the public landing page, the full payment/monetization flow
+(plan catalog → checkout redirect → polling-based payment status → account page + billing history),
+and admin-only account screens (analytics, users) are all built, as is the English/Russian i18n
+layer (`react-i18next`, `src/lib/i18n/`; currently pinned to Russian via `FORCED_LOCALE`). Not yet
+started: charts.
 
 ## Multi-exchange support
 
-The backend streams more than one exchange (Binance + MEXC Futures today, Bybit registered ahead of
-its backend rollout; MEXC Spot later), and the frontend handles that end to end. Don't reintroduce Binance-only assumptions.
+The backend streams more than one exchange (Binance, MEXC and Bybit, each Spot + Futures where
+enabled), and the frontend handles that end to end. **Which exchanges and markets exist is decided by
+the backend at runtime** (`GET /api/exchanges`), so a new backend adapter appears without frontend
+code changes. Don't reintroduce Binance-only or fixed-exchange-list assumptions.
 **The plan behind it (decisions D1–D8, store shape, the masonry deviation) is
 [`.claude/plans/multi-exchange-review.md`](.claude/plans/multi-exchange-review.md); read it before
 touching the order book, notifications or the Settings pickers.**
@@ -41,6 +45,11 @@ Each file there **supersedes** the same-named doc in `.claude/docs/`:
 - [`changes/classification-rule-api.md`](.claude/docs/changes/classification-rule-api.md): no API
   change. Rules stay **exchange-independent** (`(symbol, market)`), so the rule picker
   de-duplicates the ticker pool by `(symbol, market)`.
+- [`changes/exchange-metadata-api.md`](.claude/docs/changes/exchange-metadata-api.md) (new
+  endpoint): `GET /api/exchanges` returns `{ exchanges: [{ id, label, logoUrl, markets: [{ market,
+  instrumentCount, status: { discovery } }] }] }`, enabled venues only, in display order.
+  `status.discovery` (`PENDING`/`OK`/`RETAINED`) is instrument-discovery state, **not** connection
+  health; it's stored but not displayed.
 
 `symbol` is normalized `BASEQUOTE` on every exchange, in the feed, the ticker list and the rules
 API alike (confirmed with the backend; the ticker doc's "native spelling" note is outdated).
@@ -53,15 +62,23 @@ Key decisions from the plan, in short:
   every notification card).
 - **Mutes apply across all exchanges** and keep their `SYMBOL:MARKET` localStorage format, so no
   migration is needed.
-- **The exchange registry is the allowlist**
-  ([`src/features/orderbook/exchanges.ts`](src/features/orderbook/exchanges.ts)): label + logo
-  (`src/assets/exchanges/*.png`) per exchange, and its order is the tie-break for equal prices.
-  The feed client drops envelopes for exchanges that aren't registered. Adding an exchange = one
-  asset + one registry line. The Settings ticker pool is deliberately *not* filtered by it.
+- **The exchange registry is backend-driven** (supersedes plan D4's "registry = allowlist";
+  [`src/features/orderbook/exchanges.ts`](src/features/orderbook/exchanges.ts)). It's a Zustand
+  store resolved from, highest first: the last valid `/api/exchanges` response
+  (`exchangeMetadata.ts`), its localStorage cache, a bundled seed (Binance, MEXC, Bybit), and —
+  only as a temporary fallback — exchanges first seen in the feed (`provisional`). A malformed
+  payload is rejected whole and never replaces a valid registry; a valid empty list is applied.
+  Its order is the tie-break for equal prices. Bundled logos (`src/assets/exchanges/*.png`) always
+  win for those three; others use a relative `/api/` `logoUrl` or `ExchangeLogo`'s letter fallback.
+  The feed accepts an unregistered exchange only if its id matches `^[A-Z0-9]{1,32}$` and the
+  registry holds fewer than 32. Adding an exchange needs **no frontend change** (a bundled logo is
+  optional polish). The Settings ticker pool is deliberately *not* filtered by it.
 - **Notifications are per exchange**: the diff runs against that exchange's previous levels, and
   `Notification` plus the cooldown key carry `exchange`. The panel search matches the exchange label.
 - **Masonry is reassigned only on reorder / column-count change**, never on a card's height change,
-  so cards don't hop columns per tick and the page keeps subscribing to `keys` only.
+  so cards don't hop columns per tick. Re-deals are
+  **stable** (US4): cards keep their column and only re-order within it; only a sort-mode change,
+  a column-count increase or excessive imbalance re-deals from scratch.
 
 ## Commands
 
@@ -79,7 +96,10 @@ only automated check — run it before considering a change done.
 
 The dev server proxies `/api` and `/ws` to the backend same-origin (no CORS). Target defaults to
 `http://localhost:8080`; override via `VITE_DEV_PROXY_TARGET` in `.env.local` (gitignored) to point
-at a different backend.
+at a different backend. Vite logs every proxied socket that closes mid-stream as an error, so
+`ws proxy socket error: EPIPE` / `ECONNRESET` around a backend restart, a page reload or a closed
+tab is normal teardown, not a proxy misconfiguration. Run only one dev server: a second one
+silently takes port 5174, and every dashboard tab on either opens its own feed socket.
 
 ## Configuration
 
@@ -125,10 +145,10 @@ WebSocket (feedClient.ts, module-level singleton)
     │  (a hidden-tab fallback timer covers throttled rAF)
     ▼
 useOrderbookStore (Zustand, OUTSIDE React) ──► React UI subscribes selectively
-    │  applyMessages() diffs each live DEPTH       (only on-screen data re-renders;
-    │  against that exchange's PRE-overwrite        `DashboardPage` subscribes only to
-    │  levels and returns raised notifications      `keys`, each card only to its own
-    ▼                                                `books[key]` slice)
+    │  applyMessages() diffs each live DEPTH       (each card subscribes only to its own
+    │  against that exchange's PRE-overwrite        `books[key]` slice; see the DashboardPage
+    │  levels and returns raised notifications      note below)
+    ▼
 cooldown.ts (dedup by exchange:symbol:market:side:price:tier, 5 min window)
     ▼
 useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / NotificationHandle
@@ -141,6 +161,13 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
 - A changed book gets a fresh object identity; untouched books keep theirs, and `keys` (the sorted
   ticker list) only gets a new array identity when the *set* of tickers changes — never on a
   routine level update. This is what makes fine-grained selector subscriptions actually pay off.
+- `DashboardPage` subscribes to `keys`, to the exchange-filtered visible keys (`useShallow`, so
+  only a change of the visible *set* re-renders it) and — in the default `importance` sort only —
+  to the whole `books` map, because importance re-sorts on every flush. Its children
+  (`OrderbookCard`, `DashboardHeader`, `NotificationPanel`, `NotificationHandle`, `SettingsModal`)
+  are therefore `React.memo`'d and receive stable `useCallback` handlers, so a page re-render
+  doesn't re-render them; each card still re-renders on its own store subscriptions. Keep both
+  in place when adding props or children.
 - The socket payload is **not** run through Zod (unlike REST) — see the comment in
   `src/features/orderbook/types.ts` for why: it's a high-frequency, server-generated, perf-critical
   path, and a cheap structural guard in `feedClient.ts` (switch on `type`, `[]`-fallback arrays) is
@@ -166,6 +193,8 @@ spinner) merged with live API data once it resolves.
 |---|---|---|
 | Order book (real-time) | Store outside React, written by the WebSocket client | Zustand |
 | Notifications (real-time) | Store outside React, written by the flush pipeline (not the socket directly) | Zustand |
+| Exchange registry | Store outside React, filled from `GET /api/exchanges` (TanStack Query), its localStorage cache and a bundled seed | Zustand |
+| Client preferences (exchange filter, notification settings) | Stores outside React, hydrated from and persisted to localStorage; no backend | Zustand |
 | REST / server state (rules, billing, auth profile) | TanStack Query cache | `@tanstack/react-query` |
 | Forms | Local + schema-validated | React Hook Form + Zod (Zod schemas double as the runtime validator and the TS type source) |
 
@@ -175,10 +204,10 @@ spinner) merged with live API data once it resolves.
 src/
   config/      env.ts — the single validated config source, read by nothing else via import.meta.env
   lib/         shared infra: queryClient.ts, api/ (auth-agnostic REST client), ws/feedClient.ts (socket singleton)
-  app/         app shell: routed guards + bootstrap gate (SessionGate, ProtectedRoute, PublicRoute)
+  app/         app shell: routed guards + bootstrap gate (SessionGate, ProtectedRoute, PublicRoute, AdminRoute)
   stores/      real-time state that lives OUTSIDE React — orderbookStore, notificationStore
   features/    feature modules: auth, orderbook (dashboard), billing (plans/checkout/account), settings
-               (classification rules + notification prefs), landing
+               (classification rules + notification prefs), admin (analytics + users), landing
   components/  shared UI primitives (Button, TextField, PasswordField, Card, Banner, BrandMark, …) + layouts/
 ```
 
@@ -191,9 +220,12 @@ src/
   Query's `useMe` loading state (`status === 'authenticated' && me.isLoading`), *not* a third Zustand
   status — the token store stays tokens-only.
 - **`ProtectedRoute`** — redirects anonymous visitors to `/login`. Gating is **token-presence only**,
-  it does NOT read `accessState` — wraps `/dashboard`, `/account`, `/account/billing-history`, and
-  every `/billing/*` route, but none of them individually re-check subscription access beyond that
-  (see the Monetization note on advisory-only gating below).
+  it does NOT read `accessState` — wraps `/dashboard`, `/account`, `/account/billing-history`,
+  `/account/settings`, the admin routes and every `/billing/*` route, but none of them
+  individually re-check subscription access beyond that (see the Monetization note on
+  advisory-only gating below).
+- **`AdminRoute`** — nested inside `ProtectedRoute` on `/account/analytics` and `/account/users`
+  only; adds the role check. `/account/settings` is for every user.
 - **`PublicRoute`** — bounces an already-authenticated user off `/login` and `/register`.
 - `/` (the landing page) and `/verify-email` / `/register/check-inbox` are unguarded in any auth
   state — the landing page self-adapts to auth state instead of redirecting (see
@@ -230,7 +262,10 @@ pages/ (React) ──► queries.ts (React Query) ──► session.ts (Zustand,
 
 Import auth surface from the barrel [`@/features/auth`](src/features/auth/index.ts). The orderbook,
 billing, and landing features follow the same barrel-export convention (`index.ts` re-exports the
-public surface; nothing outside the feature reaches into its internals).
+public surface). Known exception: the orderbook's shared domain modules (`types`, `format`,
+`tiers`, `exchanges`, `exchangeMetadata`, `components/ExchangeLogo`, the notification helpers)
+are imported directly by `settings` and `lib/ws/feedClient.ts`; don't widen that to its
+components or pages.
 
 ### Order book feature module (`src/features/orderbook/`)
 
@@ -242,14 +277,40 @@ public surface; nothing outside the feature reaches into its internals).
 - **`useOrderbookFeed.ts`** — the effect hook that starts/stops the module-level feed singleton for
   the component's lifetime; `startFeed`/`stopFeed` are idempotent so React StrictMode's
   mount→unmount→mount is safe.
-- **`exchanges.ts`** — the exchange registry (label + logo) and the feed's allowlist; registry
-  order is the tie-break for equal prices across exchanges.
+- **`exchanges.ts`** — the runtime exchange registry store (`useExchangeRegistry`: `ids` in
+  display order, `meta` per id, a `version` counter), the shared payload validator
+  (`parseExchangesPayload`, used for the server response and the cache) and the non-reactive
+  hot-path accessors `exchangeMeta()` / `exchangeRank()` / `exchangeLogoSrc()`. Components that
+  render labels/logos subscribe to `version` only (it changes on metadata arrival, never per
+  tick). It imports nothing from the filter store or the metadata query (no cycles).
+- **`exchangeMetadata.ts`** — `useExchangeMetadata()` (TanStack Query, called by `DashboardPage`
+  and `MutedVenues`), which applies a validated `/api/exchanges` response to the registry inside
+  the query function. Refetches are throttled by the last ATTEMPT time (60 s) and triggered by a
+  feed-revealed exchange (`provisionalSeq`) or a socket reconnect; both triggers are module-level
+  store subscriptions, not React effects.
+- **`components/ExchangeLogo.tsx`** — bundled logo → server `logoUrl` → first-letter fallback;
+  the caller's size class sets the box.
+- **`exchangeFilterStore.ts`** + **`exchangeFilter.ts`** — the header's per-exchange filter
+  (`ExchangeFilterMenu`). The store keeps the user's persisted **`saved`** hidden list (never
+  pruned, so a temporarily unlisted exchange keeps its choice) and derives the effective
+  **`hidden`** list every consumer reads: `saved` ∩ the registry's current ids, or none if that
+  would hide them all. `hidden` only changes identity when its contents change. A newly listed
+  exchange shows by default; the last visible exchange can't be hidden. It reads the registry and
+  never writes it. It's **display-only**: the feed client doesn't read it, so all data keeps
+  flowing and re-showing an exchange is instant. The pure helpers apply it to the card merge, the visible-keys
+  selector (`useShallow`, so the page still re-renders only when the visible set changes),
+  importance tier counts, masonry row estimates and the notification panel/handle counts.
 - **`masonry.ts`** — pure column assignment for the dashboard grid: cards dealt in sort order to
   the shortest column by an *estimated* height (rows × row height + chrome). `DashboardPage` holds
   the column count (`ResizeObserver`) and keeps the sorted-keys identity stable across unchanged
-  orders, so a re-deal happens only on an actual reorder.
+  orders, so a re-deal happens only on an actual reorder. Re-deals go through
+  `assignColumnsStable` (keep each card's column, re-order within it, fall back to a fresh deal
+  past `REBALANCE_SLACK_PX` of extra imbalance). `OrderbookCard` keys rows by `exchange:price`
+  and holds a delayed-shrink `minHeight` (`useReservedRows`, 10 s) to damp top-5 churn — not
+  fixed-height placeholder rows. Below `lg` the notification panel overlays the grid.
 - **`sortOrderbooks.ts`** — the sort-menu modes; `importance` ranks by tier counts summed across
-  every exchange of a pair.
+  the pair's **visible** exchanges (the header filter applies), computed once per pair per sort
+  pass; ties keep the store's alphabetical order (`Array.sort` is stable).
 - **`notifications/selectNotifications.ts`** — pure diff function: given one exchange's previous
   levels for a pair and an incoming `DEPTH`, decides which levels are notification-worthy (a new
   price or a tier change does).
@@ -261,9 +322,23 @@ public surface; nothing outside the feature reaches into its internals).
 - **`tiers.ts`** — the tier→color scale (indexed by tier, index 0 an unused placeholder) shared by
   order book bars, notification stripes and the Settings minimum-tier control; these are data-viz
   values for this surface, not design-system theme tokens.
-- Components (`DashboardHeader`, `OrderbookCard`, `NotificationPanel`, `NotificationHandle`,
-  `NotificationCard`) are conventional React reading from the stores via selectors — see
-  `DashboardPage.tsx` for how the page composes them.
+- Components (`DashboardHeader`, `SortMenu`, `ExchangeFilterMenu`, `OrderbookCard`,
+  `NotificationPanel`, `NotificationHandle`, `NotificationCard`, `ExchangeLogo`) are conventional
+  React reading from the stores via selectors — see `DashboardPage.tsx` for how the page composes
+  them.
+- **Header layout:** `--header-h` on `DashboardPage`'s root is the single source of the header's
+  height (60px, one row, from `lg` = 1024px up; 104px below `lg`, where Sort + Exchanges wrap to a
+  second row). The notifications panel, its handle and the reconnect notice are positioned from it
+  — use the variable, never a hardcoded `60px`. The header never scrolls horizontally; below `sm`
+  secondary info (ticker count) is hidden. `lg` matches `WIDE_QUERY`, where the panel switches
+  from pushing the grid to overlaying it.
+- **Header dropdowns** (`SortMenu`, `ExchangeFilterMenu`) render their menu + outside-click
+  catcher in a **portal on `<body>`** at `z-[60]` (above the panel `z-50` and handle `z-40`, below
+  the Settings modal `z-[100]`), positioned by `components/useAnchoredMenu.ts` (fixed, under the
+  trigger, clamped to the viewport). Kept outside the header because the in-header version went
+  invisible in Safari at narrow widths (suspected WebKit clipping of fixed descendants of the then
+  scrolling header; not browser-verified) — the portal sidesteps that class of issue. Reuse the
+  hook for any new header dropdown.
 
 ### Billing feature module (`src/features/billing/`)
 
@@ -284,8 +359,9 @@ redirect. `CheckoutStubPage` (`/billing/checkout`) predates the real flow and is
 network calls and its own comment calls it a placeholder — but it's still routed; don't treat it as
 part of the current purchase flow.
 
-`AccountPage` + `BillingHistoryPage` (orders + entitlement-ledger tabs) share `AccountLayout`, a
-sidebar shell separate from the dashboard chrome. `historyView.ts` holds the code→label/color maps
+`AccountPage`, `BillingHistoryPage` (orders + entitlement-ledger tabs), settings' `SettingsPage`
+and the admin `AnalyticsPage` / `UsersPage` share `AccountLayout`, a sidebar shell separate from
+the dashboard chrome (below `md` its sidebar becomes a horizontal nav strip above the content). `historyView.ts` holds the code→label/color maps
 (`STATUS`, `REASON`, `SOURCE`) for rendering backend enums — the same "map server codes to display
 metadata in a small colocated module" pattern used by `catalog.ts`; extend those maps rather than
 switching on the raw enum inline in JSX.
@@ -296,8 +372,12 @@ Flow/UX rationale and the negative-path table (cancelled payment, lost tab, retr
 
 ### Settings feature module (`src/features/settings/`)
 
-Two independent concerns share this module, both surfaced through `SettingsModal` (opened from the
-dashboard header, not a routed page):
+Two independent concerns share this module, surfaced in two places with the same components:
+`SettingsModal` (opened from the dashboard header; below `md` its nav rail becomes a tab strip
+above the content) and the routed `pages/SettingsPage.tsx` (`/account/settings`, inside
+`AccountLayout`, which remaps two color tokens for its card depth). The mute lists switch
+row layout per list width with a CSS container query (`@container` / `@xs`), so all rows of a
+list change together:
 
 - **Classification rules** (`ClassificationRules.tsx`, `RuleEditor.tsx`, `CustomRulesList.tsx`,
   `rulesValidation.ts`) — per-`(symbol, market)` CRUD over the tier thresholds that decide which
@@ -309,7 +389,12 @@ dashboard header, not a routed page):
   `UpgradeNote.tsx`). Domain model and thresholds:
   [`.claude/docs/classification-rule-api.md`](.claude/docs/classification-rule-api.md).
 - **Notification preferences** (`NotificationsSettings.tsx`, `MinimumTierControl.tsx`,
-  `MutedTickers.tsx`, `notificationSettingsStore.ts`) — minimum tier + muted book keys. **Client-side
+  `MutedTickers.tsx`, `MutedVenues.tsx`, `notificationSettingsStore.ts`) — minimum tier + muted book
+  keys + muted venues (`venueKey(exchange, market)` = the backend's `EXCHANGE_MARKET`, one row per
+  registry exchange × **that exchange's own markets** via `venueOptions.ts`, so a Spot-only or
+  Futures-only exchange gets one row; persisted as the *muted* set and never pruned, so new venues
+  start unmuted and a temporarily unlisted venue keeps its mute). Venue mutes are notifications-only: dropped at the push boundary and hidden at
+  display time (panel, `N NEW`, handle badge); the grid and the header exchange filter ignore them. **Client-side
   only** (persisted to localStorage via `storage.ts`, no backend endpoint). The store is
   framework-agnostic (plain Zustand `create`, no React coupling) and hydrated at module load
   specifically so `feedClient.ts` can read it synchronously via `getState()` on the flush hot path
@@ -324,8 +409,9 @@ and the pool is de-duplicated by `(symbol, market)` since rules and mutes are ex
 
 1. **Auth** — ✅ built. Register/verify/login/session/logout.
 2. **Order book** — ✅ built (flagship, performance-critical). Live, continuously-updated order
-   books merged across exchanges (Binance + MEXC today); detects meaningful changes (new/removed significant orders) and surfaces them as
-   notifications, with a sort menu and per-user mute/tier filtering (see Settings below). Spoken/TTS
+   books merged across every backend-listed exchange (Binance, MEXC, Bybit today); detects
+   meaningful changes (new/removed significant orders) and surfaces them as notifications, with a
+   sort menu, a per-exchange display filter and per-user mute/tier filtering (see Settings below). Spoken/TTS
    alerts are not yet implemented. Governed by the real-time architecture above. Socket protocol:
    [`.claude/docs/changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md).
 3. **Classification rules** — ✅ built. Per-user CRUD for the tier thresholds that drive how order
@@ -357,8 +443,9 @@ and the pool is de-duplicated by `(symbol, market)` since rules and mutes are ex
 - [`.claude/docs/billing-history-api.md`](.claude/docs/billing-history-api.md) — order history and
   entitlement-ledger endpoints backing `BillingHistoryPage`.
 - [`.claude/docs/changes/`](.claude/docs/changes/) — the backend's revised multi-exchange contracts
-  (WebSocket feed, ticker list, classification rules). Each file supersedes the same-named doc
-  above. See "Multi-exchange support".
+  (WebSocket feed, ticker list, classification rules) plus the new exchange-metadata endpoint
+  (`exchange-metadata-api.md`). Each file supersedes the same-named doc above, where one exists.
+  See "Multi-exchange support".
 - [`.claude/docs/frontend-architecture.md`](.claude/docs/frontend-architecture.md) — the high-level
   "what and why" of the frontend direction (a proposed default, not a locked mandate).
 - [`.claude/docs/landing-page.md`](.claude/docs/landing-page.md) — how the public landing page +
