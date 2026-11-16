@@ -15,6 +15,9 @@ export type { Exchange } from '@/features/orderbook/exchanges';
 
 export type Market = 'SPOT' | 'FUTURES';
 
+/** Every market the feed can carry, in display order. Single source for UI that enumerates markets. */
+export const MARKETS = ['SPOT', 'FUTURES'] as const satisfies readonly Market[];
+
 /** Level importance. Tier 0 is never sent on the wire (doc §3.5). */
 export type Tier = 1 | 2 | 3 | 4;
 
@@ -82,6 +85,15 @@ export type BookKey = string; // `${symbol}:${market}`
  */
 export const bookKey = (symbol: string, market: Market): BookKey => `${symbol}:${market}`;
 
+export type VenueKey = string; // `${exchange}_${market}`
+
+/**
+ * The canonical key for one `(exchange, market)` venue, in the backend's own `EXCHANGE_MARKET`
+ * spelling (ticker-list contract §3.1, e.g. `MEXC_FUTURES`), so it round-trips through
+ * `parseVenue()`. Used by the notification venue mutes.
+ */
+export const venueKey = (exchange: string, market: Market): VenueKey => `${exchange}_${market}`;
+
 /**
  * A decoded `DEPTH` envelope (doc §3.3–3.4) for one `(exchange, market, symbol)` book.
  * `data: null` removes that exchange's book from the pair.
@@ -96,7 +108,8 @@ export interface DepthMessage {
 
 /**
  * The decoded messages the store consumes. The feed client's guard has already dropped
- * unknown types, unregistered exchanges and malformed envelopes (live and inside a
- * snapshot), so everything here is known-good.
+ * unknown types, exchanges with an invalid id (or beyond the registry cap) and malformed
+ * envelopes (live and inside a snapshot), so everything here is known-good. A well-formed
+ * exchange id the registry doesn't list yet is kept and recorded as provisional.
  */
 export type FeedMessage = { type: 'SNAPSHOT'; data: DepthMessage[] } | DepthMessage;

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { SORT_OPTIONS, type SortMode } from '@/features/orderbook/sortOrderbooks';
+import { useAnchoredMenu } from '@/features/orderbook/components/useAnchoredMenu';
 
 interface SortMenuProps {
   sortMode: SortMode;
@@ -15,6 +17,7 @@ interface SortMenuProps {
 export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
   const { t } = useTranslation('orderbook');
   const [open, setOpen] = useState(false);
+  const { anchorRef, menuRef, menuStyle } = useAnchoredMenu(open);
   const activeLabelKey =
     SORT_OPTIONS.find((o) => o.id === sortMode)?.labelKey ?? SORT_OPTIONS[0].labelKey;
 
@@ -28,17 +31,20 @@ export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
   }, [open]);
 
   return (
-    <div className="relative">
+    // Below `lg`: half of the header's second row (button fills it). From `lg` up: natural
+    // inline width; `min-w-0` + the truncating value let it give way instead of overflowing.
+    <div ref={anchorRef} className="relative min-w-0 flex-1 basis-0 lg:flex-initial lg:basis-auto">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-2 rounded-lg border border-border-input px-3
+        className={`flex w-full max-w-full items-center justify-between gap-2 whitespace-nowrap rounded-lg
+                    border border-border-input px-3 lg:inline-flex lg:w-auto
                     py-2 font-sans text-[13px] transition-colors ${
                       open ? 'bg-white/5 text-text-strong' : 'bg-transparent text-text-secondary hover:bg-white/5 hover:text-text-strong'
                     }`}
       >
-        <span className="text-text-dim">{t('sort.label')}</span>
-        <span className="text-text-strong">{t(activeLabelKey)}</span>
+        <span className="hidden text-text-dim xl:inline">{t('sort.label')}</span>
+        <span className="min-w-0 truncate text-text-strong">{t(activeLabelKey)}</span>
         <svg
           width="12"
           height="12"
@@ -54,11 +60,15 @@ export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
         </svg>
       </button>
 
-      {open && (
+      {/* Portaled to <body>: see `useAnchoredMenu` for why the menu can't live in the header. */}
+      {open &&
+        createPortal(
         <>
-          <div className="fixed inset-0 z-[15]" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
           <div
-            className="absolute top-[calc(100%+6px)] left-0 z-20 flex min-w-[250px] flex-col gap-0.5
+            ref={menuRef}
+            style={menuStyle}
+            className="z-[60] flex min-w-[250px] flex-col gap-0.5
                        rounded-[10px] border border-border bg-surface p-1.5 shadow-[var(--shadow-card)]"
           >
             {SORT_OPTIONS.map((opt) => {
@@ -82,8 +92,9 @@ export function SortMenu({ sortMode, onSortModeChange }: SortMenuProps) {
               );
             })}
           </div>
-        </>
-      )}
+        </>,
+          document.body,
+        )}
     </div>
   );
 }

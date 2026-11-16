@@ -1,5 +1,9 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { countVisibleUnread } from '@/features/orderbook/exchangeFilter';
+import { useExchangeFilterStore } from '@/features/orderbook/exchangeFilterStore';
+import { useNotificationSettingsStore } from '@/features/settings';
 
 interface NotificationHandleProps {
   /** Whether the panel is open — drives the fade (open ⇒ faded out, non-interactive). */
@@ -16,9 +20,19 @@ interface NotificationHandleProps {
  * Self-subscribes to `unread` (the count since the panel was last opened) so a push
  * re-renders only this handle — never `DashboardPage` and the grid (plan §8a).
  */
-export function NotificationHandle({ open, onOpen }: NotificationHandleProps) {
+export const NotificationHandle = memo(function NotificationHandle({
+  open,
+  onOpen,
+}: NotificationHandleProps) {
   const { t } = useTranslation('orderbook');
-  const unread = useNotificationStore((s) => s.unread);
+  // Badge counts only unread notifications from exchanges the header filter leaves visible and
+  // venues not muted in notification settings. `notifications` changes on every push, exactly
+  // when `unread` does, so this subscribes to nothing more frequent than before.
+  const notifications = useNotificationStore((s) => s.notifications);
+  const totalUnread = useNotificationStore((s) => s.unread);
+  const hidden = useExchangeFilterStore((s) => s.hidden);
+  const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
+  const unread = countVisibleUnread(notifications, totalUnread, hidden, mutedVenues);
 
   return (
     <button
@@ -26,7 +40,8 @@ export function NotificationHandle({ open, onOpen }: NotificationHandleProps) {
       onClick={onOpen}
       title={t('panel.title')}
       aria-label={t('panel.open')}
-      className={`fixed right-0 top-24 z-40 flex h-12 w-12 items-center justify-center
+      // 36px below the header (was `top-24` = 96px under the 60px header), via `--header-h`.
+      className={`fixed right-0 top-[calc(var(--header-h)+36px)] z-40 flex h-12 w-12 items-center justify-center
                   rounded-l-[10px] border border-r-0 border-border bg-accent text-bg shadow-card
                   [transition:opacity_200ms_ease,filter_150ms_ease] hover:brightness-110 ${
                     open ? 'pointer-events-none opacity-0' : 'pointer-events-auto opacity-100'
@@ -56,4 +71,4 @@ export function NotificationHandle({ open, onOpen }: NotificationHandleProps) {
       )}
     </button>
   );
-}
+});

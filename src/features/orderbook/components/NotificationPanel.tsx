@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotificationCard } from '@/features/orderbook/components/NotificationCard';
 import { matches } from '@/features/orderbook/notifications/notificationSearch';
+import { countVisibleUnread, isNotificationVisible } from '@/features/orderbook/exchangeFilter';
+import { useExchangeFilterStore } from '@/features/orderbook/exchangeFilterStore';
+import { useExchangeRegistry } from '@/features/orderbook/exchanges';
+import { useNotificationSettingsStore } from '@/features/settings';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 import { useNotificationStore } from '@/stores/notificationStore';
 
@@ -28,13 +32,22 @@ interface NotificationPanelProps {
  * to the notification store (never via `DashboardPage`, which would re-render the grid on
  * every push — plan §8a).
  */
-export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanelProps) {
+export const NotificationPanel = memo(function NotificationPanel({
+  open,
+  sizeMode,
+  onClose,
+}: NotificationPanelProps) {
   const { t } = useTranslation('orderbook');
   const [query, setQuery] = useState('');
   const notifications = useNotificationStore((s) => s.notifications);
   const unread = useNotificationStore((s) => s.unread);
   const markRead = useNotificationStore((s) => s.markRead);
   const clear = useNotificationStore((s) => s.clear);
+  const hidden = useExchangeFilterStore((s) => s.hidden);
+  const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
+  // Cards and the search read exchange labels/logos from the registry non-reactively; this
+  // re-renders them when it changes (metadata arrival — rare).
+  useExchangeRegistry((s) => s.version);
 
   // Reset unread on each open transition (and on initial mount when default-open).
   // Depends on `open` only — NOT on `notifications` — so while the panel is open the
@@ -44,16 +57,24 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
   }, [open, markRead]);
 
   // Newest-first ordering comes from the store (index 0 is newest) — no sort needed.
-  const visible = notifications.filter((n) => matches(n, query));
+  // The exchange filter applies at DISPLAY time only: hidden exchanges' notifications stay in
+  // the store and reappear as soon as the exchange is shown again. Venue mutes also hide
+  // notifications raised before the mute (new ones are already dropped in the feed flush).
+  const visible = notifications.filter(
+    (n) => isNotificationVisible(n, hidden, mutedVenues) && matches(n, query),
+  );
+  const visibleUnread = countVisibleUnread(notifications, unread, hidden, mutedVenues);
 
   return (
     <aside
       aria-label={t('panel.title')}
-      className="fixed top-[60px] right-0 bottom-0 z-50 flex flex-col border-l border-border
+      // Starts right under the header (`--header-h`, set on `DashboardPage`: 60px / 104px).
+      className="fixed top-[var(--header-h)] right-0 bottom-0 z-50 flex flex-col border-l border-border
                  bg-surface shadow-card
                  [transition:transform_260ms_cubic-bezier(0.22,0.61,0.36,1)]"
       style={{
-        width: PANEL_WIDTH,
+        // Never wider than the viewport: on a phone-width window the panel overlays the grid.
+        width: `min(${PANEL_WIDTH}px, 100vw)`,
         // `+ 40px` overshoot fully hides the box shadow when closed.
         transform: open ? 'translateX(0)' : 'translateX(calc(100% + 40px))',
       }}
@@ -63,7 +84,7 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
         <div className="flex items-baseline gap-2.5">
           <span className="text-[15px] font-semibold text-text">{t('panel.title')}</span>
           <span className="font-mono text-[10px] tracking-[0.08em] text-accent">
-            {t('panel.new', { n: unread })}
+            {t('panel.new', { n: visibleUnread })}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -152,4 +173,4 @@ export function NotificationPanel({ open, sizeMode, onClose }: NotificationPanel
       </div>
     </aside>
   );
-}
+});

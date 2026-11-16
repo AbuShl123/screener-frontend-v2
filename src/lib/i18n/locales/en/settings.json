@@ -31,6 +31,20 @@
       "mute": "Mute",
       "unmute": "Unmute",
       "empty": "No muted tickers — every book can notify"
+    },
+    "venues": {
+      "heading": "Muted exchanges",
+      "desc": "Mute notifications from a whole exchange and market. Order book cards stay visible — this only affects notifications.",
+      "count": "{{n}} MUTED",
+      "name": "{{exchange}} {{market}}",
+      "market": {
+        "SPOT": "Spot",
+        "FUTURES": "Futures"
+      },
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "muteAria": "Mute {{name}} notifications",
+      "unmuteAria": "Unmute {{name}} notifications"
     }
   },
   "rules": {
