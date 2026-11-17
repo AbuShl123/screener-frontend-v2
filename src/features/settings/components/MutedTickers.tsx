@@ -35,7 +35,8 @@ export function MutedTickers({ open }: { open: boolean }) {
 
   return (
     <section className="flex flex-col gap-[15px]">
-      <div className="flex items-baseline justify-between gap-3">
+      {/* Wraps the count under the description only when they don't fit side by side. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
           <h3 className="mb-[5px] text-[14px] font-semibold text-text">
             {t('notifications.muted.heading')}
@@ -90,15 +91,16 @@ export function MutedTickers({ open }: { open: boolean }) {
 
       {/* Search results */}
       {trimmed && (
-        <div className="overflow-hidden rounded-[10px] border border-border-subtle bg-input">
+        // `@container`: rows switch layout together, by the list's width (see `MutedVenues`).
+        <div className="@container overflow-hidden rounded-[10px] border border-border-subtle bg-input">
           {results.length > 0 ? (
             results.map((e) => {
               const badge = marketBadge(e.market);
               return (
                 <div
                   key={e.key}
-                  className="flex items-center justify-between gap-2.5 border-b border-border-subtle
-                             px-[13px] py-2.5 last:border-b-0"
+                  className="flex flex-col items-start gap-2 border-b border-border-subtle px-[13px] py-2.5
+                             last:border-b-0 @xs:flex-row @xs:items-center @xs:justify-between @xs:gap-2.5"
                 >
                   <div className="flex items-center gap-2.5">
                     <span className="font-mono text-[13px] tracking-[0.02em] text-text-strong">

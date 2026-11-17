@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { NotificationsSettings } from './NotificationsSettings';
@@ -28,7 +28,15 @@ const NAV: NavItem[] = [
   { id: 'appearance', labelKey: 'modal.nav.appearance', disabled: true },
 ];
 
-export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+// `memo`: the modal stays mounted on the dashboard, whose page re-renders on every feed flush
+// in importance sort; with a stable `onClose` it re-renders only on `open` or its own state.
+export const SettingsModal = memo(function SettingsModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const { t } = useTranslation('settings');
   const [tab, setTab] = useState<Tab>('rules');
 
@@ -55,7 +63,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-8
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-8
                  [background:color-mix(in_oklab,var(--color-bg)_72%,transparent)]
                  [backdrop-filter:blur(3px)]
                  [transition:opacity_160ms_ease,visibility_160ms_ease]"
@@ -89,11 +97,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           </button>
         </div>
 
-        {/* Body: nav rail + content */}
-        <div className="flex min-h-0 flex-1">
+        {/* Body: nav rail + content. From `md` up: the original side-by-side layout with a
+            260px rail. Below `md` the rail would leave the content column too narrow, so it
+            becomes a horizontal tab strip above the content (scrollable if it doesn't fit). */}
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* Nav rail */}
-          <nav className="flex w-[260px] flex-none flex-col gap-[3px] border-r border-border-subtle
-                          bg-surface-marketing px-3 py-4">
+          <nav className="flex flex-none gap-[3px] overflow-x-auto border-b border-border-subtle
+                          bg-surface-marketing px-3 py-2
+                          md:w-[260px] md:flex-col md:overflow-visible md:border-r md:border-b-0 md:py-4">
             {NAV.map((item) => {
               const active = tab === item.id;
               return (
@@ -101,8 +112,9 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   key={item.id}
                   type="button"
                   onClick={item.disabled ? undefined : () => setTab(item.id)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-lg px-[11px]
-                              py-[9px] text-left text-[13px] transition-colors ${
+                  className={`flex shrink-0 items-center justify-between gap-2 rounded-lg px-[11px]
+                              py-[9px] text-left text-[13px] whitespace-nowrap transition-colors
+                              md:w-full md:shrink md:whitespace-normal ${
                                 item.disabled
                                   ? 'cursor-default text-text-dim'
                                   : active
@@ -129,7 +141,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           </nav>
 
           {/* Content */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-[26px] pt-6 pb-[30px] scrollbar-slim">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-5 pb-[30px] scrollbar-slim sm:px-[26px] sm:pt-6">
             {tab === 'notifications' && <NotificationsSettings open={open} />}
             {tab === 'rules' && <ClassificationRules open={open} />}
           </div>
@@ -137,4 +149,4 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       </div>
     </div>
   );
-}
+});

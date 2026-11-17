@@ -1,5 +1,6 @@
 import type { ParseKeys } from 'i18next';
-import type { BookKey, Market, PairBook } from '@/features/orderbook/types';
+import { visibleVenues } from '@/features/orderbook/exchangeFilter';
+import type { BookKey, Exchange, Market, PairBook } from '@/features/orderbook/types';
 
 export type SortMode = 'importance' | 'alphabetical' | 'spot-first' | 'futures-first';
 
@@ -21,10 +22,13 @@ function marketOf(key: BookKey): Market {
   return key.slice(key.lastIndexOf(':') + 1) as Market;
 }
 
-/** Count of levels (bids + asks, across every exchange of the pair) per tier; index 0 unused. */
-function tierCounts(book: PairBook): number[] {
+/**
+ * Count of levels (bids + asks, across every VISIBLE exchange of the pair) per tier; index 0
+ * unused. Hidden exchanges don't count, so importance ranks by what the card actually shows.
+ */
+function tierCounts(book: PairBook, hidden: readonly Exchange[]): number[] {
   const counts = [0, 0, 0, 0, 0];
-  for (const venue of Object.values(book.venues)) {
+  for (const venue of visibleVenues(book, hidden)) {
     for (const level of venue.bids) counts[level.tier]++;
     for (const level of venue.asks) counts[level.tier]++;
   }
@@ -32,9 +36,7 @@ function tierCounts(book: PairBook): number[] {
 }
 
 /** More tier-4 orders always outranks any amount of tier-3 (and so on down to tier-1). */
-function compareImportance(a: PairBook, b: PairBook): number {
-  const ca = tierCounts(a);
-  const cb = tierCounts(b);
+function compareTierCounts(ca: number[], cb: number[]): number {
   for (let tier = 4; tier >= 1; tier--) {
     if (cb[tier] !== ca[tier]) return cb[tier] - ca[tier];
   }
@@ -49,11 +51,15 @@ function compareImportance(a: PairBook, b: PairBook): number {
  * `books` is read only for `'importance'`; the other modes derive everything they need
  * (symbol, market) from the key string itself. That lets the caller skip subscribing to
  * `books` — and the resulting per-tick re-render — unless importance sorting is selected.
+ *
+ * `keys` should already be filtered to visible pairs; `hidden` additionally keeps hidden
+ * exchanges' levels out of the importance tier counts.
  */
 export function sortKeys(
   keys: BookKey[],
   books: Record<BookKey, PairBook> | undefined,
   mode: SortMode,
+  hidden: readonly Exchange[] = [],
 ): BookKey[] {
   switch (mode) {
     case 'alphabetical':
@@ -69,8 +75,13 @@ export function sortKeys(
       });
     }
 
-    case 'importance':
+    case 'importance': {
       if (!books) return keys;
-      return [...keys].sort((a, b) => compareImportance(books[a], books[b]));
+      // Tier counts once per pair per pass, not twice per comparison. Same numbers, same
+      // comparator, and `Array.sort` is stable, so the resulting order is unchanged.
+      const counts = new Map<BookKey, number[]>();
+      for (const k of keys) counts.set(k, tierCounts(books[k], hidden));
+      return [...keys].sort((a, b) => compareTierCounts(counts.get(a)!, counts.get(b)!));
+    }
   }
 }

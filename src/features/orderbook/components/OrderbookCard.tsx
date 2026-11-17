@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react';
+import { memo, useLayoutEffect, useRef, type MouseEvent } from 'react';
 import { i18n } from '@/lib/i18n';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import type { BookKey, Level } from '@/features/orderbook/types';
@@ -13,7 +13,10 @@ import {
   priceDecimals,
 } from '@/features/orderbook/format';
 import { barBackground } from '@/features/orderbook/tiers';
-import { EXCHANGES, exchangeRank } from '@/features/orderbook/exchanges';
+import { exchangeMeta, exchangeRank, useExchangeRegistry } from '@/features/orderbook/exchanges';
+import { ExchangeLogo } from '@/features/orderbook/components/ExchangeLogo';
+import { visibleVenues } from '@/features/orderbook/exchangeFilter';
+import { useExchangeFilterStore } from '@/features/orderbook/exchangeFilterStore';
 // The chrome/row-height constants behind this live in `masonry.ts` and must track the
 // Tailwind classes below (header, row padding, spread divider).
 import { estimateCardHeight } from '@/features/orderbook/masonry';
@@ -39,23 +42,38 @@ interface OrderbookCardProps {
   sizeMode: SizeMode;
 }
 
-export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
+// `memo`: in importance sort `DashboardPage` re-renders on every flush; a card should only
+// re-render on its own subscriptions (its pair's book, the exchange filter) or a prop change.
+export const OrderbookCard = memo(function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   const book = useOrderbookStore((s) => s.books[bookKey]);
+  const hidden = useExchangeFilterStore((s) => s.hidden);
+  // Exchange order (equal-price tie-break), labels and logos come from the runtime registry;
+  // re-render when it changes (metadata arrival — rare, never per tick).
+  useExchangeRegistry((s) => s.version);
+
+  // Only exchanges the header filter leaves visible. Computed before the early returns below
+  // because the row reserve is a hook and must run on every render.
+  const venues = book ? visibleVenues(book, hidden) : [];
+  let rowCount = 0;
+  for (const venue of venues) rowCount += venue.asks.length + venue.bids.length;
+  // A filter change resets the reserve: the card should snap to its new visible rows.
+  const reservedRows = useReservedRows(rowCount, hidden);
 
   // Pair may vanish (last venue removed / snapshot shrink) between the parent's `keys` read and
-  // this render — the parent drops the card on the same store update, so render null.
-  if (!book) return null;
+  // this render — the parent drops the card on the same store update, so render null. A pair
+  // with no visible exchange is likewise already dropped by the parent's visible-keys selector.
+  if (!book || venues.length === 0) return null;
 
-  // Merge every exchange's rows into one ladder per side (plan §3.6): rows are NOT
+  // Merge every visible exchange's rows into one ladder per side (plan §3.6): rows are NOT
   // grouped by exchange, each level already carries its own `exchange`.
   const asks: Level[] = [];
   const bids: Level[] = [];
-  for (const venue of Object.values(book.venues)) {
+  for (const venue of venues) {
     asks.push(...venue.asks);
     bids.push(...venue.bids);
   }
 
-  // Bar scale: the max dollar notional across BOTH sides and ALL exchanges of this card.
+  // Bar scale: the max dollar notional across BOTH sides and all VISIBLE exchanges of this card.
   // Always the dollar notional regardless of the display toggle — relative size shouldn't
   // shift meaning when the unit label changes.
   let maxNotional = 0;
@@ -69,6 +87,12 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
   // (plan D5) so the rows don't swap places between ticks.
   asks.sort(byPriceDesc);
   bids.sort(byPriceDesc);
+  // Identity keys, NOT positional ones: with `ask-${i}` a level appearing above shifted every
+  // row below it onto a different price, and each bar's width transition animated between
+  // unrelated orders. Keyed by exchange + price, a row's DOM (and its transition) follows the
+  // same resting order across ticks; a genuinely new level mounts at its final width.
+  const askKeys = levelKeys(asks);
+  const bidKeys = levelKeys(bids);
 
   const badge = marketBadge(book.market);
 
@@ -78,10 +102,15 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
                  transition-colors duration-[120ms] ease-[ease]
                  hover:bg-[color-mix(in_oklab,var(--color-surface),white_4%)]
                  [content-visibility:auto]"
-      // Placeholder size for a never-rendered off-screen card; once it has rendered, `auto`
-      // makes the browser reuse its last real size instead. Cards range from 1 row to 10+,
-      // so a fixed guess is wrong for most of them.
-      style={{ containIntrinsicSize: `auto ${estimateCardHeight(asks.length + bids.length)}px` }}
+      // `containIntrinsicSize`: placeholder size for a never-rendered off-screen card; once it
+      // has rendered, `auto` makes the browser reuse its last real size instead. Cards range
+      // from 1 row to 10+, so a fixed guess is wrong for most of them.
+      // `minHeight`: the delayed-shrink reserve (see `useReservedRows`) — the card grows at once
+      // but keeps recently-seen rows' height for a while, so top-5 churn doesn't make it bob.
+      style={{
+        containIntrinsicSize: `auto ${estimateCardHeight(reservedRows)}px`,
+        minHeight: estimateCardHeight(reservedRows),
+      }}
     >
       {/* Card header: market badge + symbol (mid price & column headers off) */}
       <div className="flex items-center gap-2.5 border-b border-border-subtle px-4 py-[11px]">
@@ -99,7 +128,7 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
       <div className="pt-2 pb-3">
         {asks.map((level, i) => (
           <Row
-            key={`ask-${i}`}
+            key={askKeys[i]}
             level={level}
             side="ask"
             maxNotional={maxNotional}
@@ -109,7 +138,7 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
         <div className="mx-4 my-[7px] border-t border-dashed border-border-subtle" />
         {bids.map((level, i) => (
           <Row
-            key={`bid-${i}`}
+            key={bidKeys[i]}
             level={level}
             side="bid"
             maxNotional={maxNotional}
@@ -119,10 +148,66 @@ export function OrderbookCard({ bookKey, sizeMode }: OrderbookCardProps) {
       </div>
     </div>
   );
-}
+});
 
 const byPriceDesc = (a: Level, b: Level): number =>
   b.price - a.price || exchangeRank(a.exchange) - exchangeRank(b.exchange);
+
+/**
+ * Stable React keys for one side's rows: `EXCHANGE:price`. A price is unique per exchange per
+ * side by contract, but the socket payload is unvalidated (types.ts), so a duplicate gets a
+ * `#n` suffix rather than a React duplicate-key error.
+ */
+function levelKeys(levels: Level[]): string[] {
+  const seen = new Set<string>();
+  return levels.map((l) => {
+    const base = `${l.exchange}:${l.price}`;
+    let key = base;
+    for (let n = 2; seen.has(key); n++) key = `${base}#${n}`;
+    seen.add(key);
+    return key;
+  });
+}
+
+/**
+ * How long a card keeps the height of rows that have left before shrinking, in ms. Levels
+ * churn in and out of the top-5 window every few seconds; holding the height this long
+ * absorbs that churn, while a book that genuinely thinned out still tightens up within a
+ * few seconds' glance.
+ */
+const SHRINK_DELAY_MS = 10_000;
+
+/**
+ * Delayed-shrink row reserve — damping, not fixed-height placeholders. Returns the row count
+ * the card should reserve space for: it rises IMMEDIATELY with `rows` (content is never
+ * clipped) but falls only once `rows` has stayed below it for `SHRINK_DELAY_MS`. A change of
+ * `resetKey` (the exchange filter) snaps it to `rows` at once.
+ *
+ * The shrink is evaluated on the card's next render (it re-renders on every update to its
+ * book), so no timer is needed; a book that stops updating keeps its reserve until it does.
+ * Render only READS the ref; the bookkeeping is written in a layout effect.
+ */
+function useReservedRows(rows: number, resetKey: unknown): number {
+  const state = useRef({ reserved: rows, belowSince: 0, resetKey });
+  const s = state.current;
+
+  let reserved = s.reserved;
+  if (s.resetKey !== resetKey || rows >= reserved) {
+    reserved = rows;
+  } else if (s.belowSince !== 0 && Date.now() - s.belowSince >= SHRINK_DELAY_MS) {
+    reserved = rows;
+  }
+
+  useLayoutEffect(() => {
+    const cur = state.current;
+    if (reserved === rows) cur.belowSince = 0; // at (or snapped to) the real height
+    else if (cur.belowSince === 0) cur.belowSince = Date.now(); // just dropped below the reserve
+    cur.reserved = reserved;
+    cur.resetKey = resetKey;
+  });
+
+  return reserved;
+}
 
 interface RowProps {
   level: Level;
@@ -152,7 +237,7 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
       m: i18n.t('orderbook:card.age.m'),
       s: i18n.t('orderbook:card.age.s'),
     });
-    e.currentTarget.title = `${EXCHANGES[level.exchange].label} · ${i18n.t('orderbook:card.firstSeen', { age })}`;
+    e.currentTarget.title = `${exchangeMeta(level.exchange).label} · ${i18n.t('orderbook:card.firstSeen', { age })}`;
   };
 
   return (
@@ -163,14 +248,7 @@ function Row({ level, side, maxNotional, sizeMode }: RowProps) {
     >
       {/* Exchange logo, outside the bar so it stays readable over any tier color. A row
           swapping exchanges only swaps `src` between already-decoded images (plan §3.3). */}
-      <img
-        src={EXCHANGES[level.exchange].logo}
-        alt={EXCHANGES[level.exchange].label}
-        width={16}
-        height={16}
-        decoding="async"
-        className="block size-4 object-contain"
-      />
+      <ExchangeLogo id={level.exchange} className="size-4" />
 
       {/* Bar layer: starts after the logo column (left-[44px] = 16 padding + 16 logo + 12 gap) and ends at the
           price column's left edge (right-[156px] = 16 padding + 56 + 72 + 12 gap) */}

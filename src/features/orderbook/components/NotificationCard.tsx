@@ -8,7 +8,8 @@ import {
   marketBadge,
   priceDecimals,
 } from '@/features/orderbook/format';
-import { EXCHANGES } from '@/features/orderbook/exchanges';
+import { exchangeMeta } from '@/features/orderbook/exchanges';
+import { ExchangeLogo } from '@/features/orderbook/components/ExchangeLogo';
 import { TIER_COLORS } from '@/features/orderbook/tiers';
 import type { Notification } from '@/features/orderbook/types';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
@@ -28,7 +29,8 @@ interface NotificationCardProps {
 export function NotificationCard({ notification: n, sizeMode }: NotificationCardProps) {
   const { t } = useTranslation('orderbook');
   const badge = marketBadge(n.market);
-  const exchange = EXCHANGES[n.exchange];
+  // Non-reactive read: `NotificationPanel` re-renders its cards on registry changes.
+  const exchangeLabel = exchangeMeta(n.exchange).label;
   const isUsd = sizeMode === 'usd';
 
   return (
@@ -43,14 +45,11 @@ export function NotificationCard({ notification: n, sizeMode }: NotificationCard
         {/* Row 1: exchange logo + symbol + market badge + side  /  time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-[9px]">
-            <img
-              src={exchange.logo}
-              alt={exchange.label}
-              title={exchange.label}
-              width={14}
-              height={14}
-              decoding="async"
-              className="block size-3.5 flex-none object-contain"
+            <ExchangeLogo
+              id={n.exchange}
+              alt={exchangeLabel}
+              title={exchangeLabel}
+              className="size-3.5 flex-none"
             />
             <span className="font-mono text-[14px] tracking-[0.02em] text-text-strong">
               {fmtSymbol(n.symbol)}

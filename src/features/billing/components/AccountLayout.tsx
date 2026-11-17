@@ -21,6 +21,16 @@ const NAV: { labelKey: ParseKeys<'billing'>; path: string }[] = [
 ];
 const DISABLED_NAV: ParseKeys<'billing'>[] = ['accountNav.security'];
 
+/**
+ * Nav item frame. From `md` up it's the original left rail item (accent bar on the LEFT,
+ * `pl-5 pr-[22px]`); below `md` the rail becomes a horizontal strip above the content
+ * and each item is a tab (accent bar at the BOTTOM, `px-4`, kept on one line). Color and
+ * state classes are added per item.
+ */
+const NAV_ITEM =
+  'flex shrink-0 items-center whitespace-nowrap border-b-2 px-4 py-[11px] text-left text-[14px] ' +
+  'md:shrink md:whitespace-normal md:border-b-0 md:border-l-2 md:pl-5 md:pr-[22px]';
+
 export function AccountLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation('billing');
   const { t: tAdmin } = useTranslation('admin');
@@ -70,9 +80,14 @@ export function AccountLayout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      {/* Below `md` the left nav moves above the content as a horizontal strip (scrollable
+          if it doesn't fit), so the content gets the full width. `md`+ is the original layout. */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* ===== Left nav ===== */}
-        <nav className="flex w-56 flex-none flex-col gap-[2px] border-r border-border-subtle py-5">
+        <nav
+          className="flex flex-none gap-[2px] overflow-x-auto border-b border-border-subtle px-2
+                     md:w-56 md:flex-col md:overflow-visible md:border-r md:border-b-0 md:px-0 md:py-5"
+        >
           {NAV.map(({ labelKey, path }) => {
             const active = pathname === path;
             return (
@@ -80,11 +95,11 @@ export function AccountLayout({ children }: { children: ReactNode }) {
                 key={path}
                 type="button"
                 onClick={() => !active && navigate(path)}
-                className={
+                className={`${NAV_ITEM} ${
                   active
-                    ? 'flex items-center border-l-2 border-accent bg-accent/[0.08] py-[11px] pl-5 pr-[22px] text-left text-[14px] font-medium text-text'
-                    : 'flex cursor-pointer items-center border-l-2 border-transparent py-[11px] pl-5 pr-[22px] text-left text-[14px] text-text-muted transition-colors hover:text-text'
-                }
+                    ? 'border-accent bg-accent/[0.08] font-medium text-text'
+                    : 'cursor-pointer border-transparent text-text-muted transition-colors hover:text-text'
+                }`}
               >
                 {t(labelKey)}
               </button>
@@ -93,8 +108,7 @@ export function AccountLayout({ children }: { children: ReactNode }) {
           {DISABLED_NAV.map((labelKey) => (
             <div
               key={labelKey}
-              className="flex cursor-not-allowed items-center border-l-2 border-transparent py-[11px] pl-5 pr-[22px]
-                         text-[14px] text-text-muted opacity-60"
+              className={`${NAV_ITEM} cursor-not-allowed border-transparent text-text-muted opacity-60`}
             >
               {t(labelKey)}
             </div>
@@ -103,8 +117,11 @@ export function AccountLayout({ children }: { children: ReactNode }) {
           {/* ADMIN nav block — role-gated (plan §4). "Account" above stays the profile for
               everyone; these are distinct nav items, matching the design's navAdmin. */}
           {isAdmin && (
-            <div className="mt-[18px] flex flex-col gap-[2px] border-t border-border-subtle pt-4">
-              <div className="px-[22px] pb-2 font-mono text-[10px] uppercase tracking-[0.08em] text-text-dim">
+            <div
+              className="flex flex-none items-center gap-[2px] border-l border-border-subtle pl-2
+                         md:mt-[18px] md:flex-initial md:flex-col md:items-stretch md:border-t md:border-l-0 md:pl-0 md:pt-4"
+            >
+              <div className="px-3 font-mono text-[10px] uppercase tracking-[0.08em] text-text-dim md:px-[22px] md:pb-2">
                 {tAdmin('nav.admin')}
               </div>
               {[
@@ -121,11 +138,11 @@ export function AccountLayout({ children }: { children: ReactNode }) {
                     key={path}
                     type="button"
                     onClick={() => !active && navigate(path)}
-                    className={
+                    className={`${NAV_ITEM} justify-between gap-[10px] ${
                       active
-                        ? 'flex items-center justify-between gap-[10px] border-l-2 border-accent bg-accent/[0.08] py-[11px] pl-5 pr-[22px] text-left text-[14px] font-medium text-text'
-                        : 'flex cursor-pointer items-center justify-between gap-[10px] border-l-2 border-transparent py-[11px] pl-5 pr-[22px] text-left text-[14px] text-text-muted transition-colors hover:text-text'
-                    }
+                        ? 'border-accent bg-accent/[0.08] font-medium text-text'
+                        : 'cursor-pointer border-transparent text-text-muted transition-colors hover:text-text'
+                    }`}
                   >
                     <span>{label}</span>
                     {meta && <span className="font-mono text-[11px] text-text-dim">{meta}</span>}
@@ -136,14 +153,15 @@ export function AccountLayout({ children }: { children: ReactNode }) {
           )}
 
           <div className="flex-1" />
-          <div className="mt-2 border-t border-border-subtle px-[22px] pt-2">
+          <div className="flex-none border-border-subtle md:mt-2 md:flex-initial md:border-t md:px-[22px] md:pt-2">
             <button
               type="button"
               onClick={onSignOut}
               disabled={loggingOut}
-              className="flex items-center gap-[9px] border-l-2 border-transparent py-[11px] pl-5 text-[14px]
-                         text-danger/70 transition-colors hover:text-danger disabled:cursor-not-allowed
-                         disabled:opacity-50"
+              className="flex shrink-0 items-center gap-[9px] whitespace-nowrap border-b-2 border-transparent px-4
+                         py-[11px] text-[14px] text-danger/70 transition-colors hover:text-danger
+                         disabled:cursor-not-allowed disabled:opacity-50
+                         md:whitespace-normal md:border-b-0 md:border-l-2 md:pl-5 md:pr-0"
             >
               <svg
                 width="16"

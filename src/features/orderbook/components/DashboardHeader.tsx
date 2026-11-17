@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { logout, useMe } from '@/features/auth';
 import { accountHome } from '@/lib/accountHome';
 import { SortMenu } from '@/features/orderbook/components/SortMenu';
+import { ExchangeFilterMenu } from '@/features/orderbook/components/ExchangeFilterMenu';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 import type { SortMode } from '@/features/orderbook/sortOrderbooks';
 
 interface DashboardHeaderProps {
-  /** Live ticker count from the store's `keys.length` (display only). */
+  /** Count of pairs visible under the exchange filter (display only). */
   tickerCount: number;
   /** Current display unit for card notionals — owned by `DashboardPage`. */
   sizeMode: SizeMode;
@@ -28,7 +29,7 @@ interface DashboardHeaderProps {
  * The dashboard deliberately does NOT block on `/me` — if the profile failed to load,
  * the avatar just falls back to "·".
  */
-export function DashboardHeader({
+export const DashboardHeader = memo(function DashboardHeader({
   tickerCount,
   sizeMode,
   onSizeModeChange,
@@ -56,31 +57,48 @@ export function DashboardHeader({
 
   return (
     <header
-      className="sticky top-0 z-10 flex h-[60px] items-center gap-6 border-b border-border
-                 bg-surface-marketing px-8"
+      // Height comes from `--header-h` (set on `DashboardPage`'s root), which the notifications
+      // panel, its handle and the reconnect notice also read: 60px from `lg` up (one row, the
+      // desktop layout), 104px below `lg`, where the header wraps into two rows — Sort and
+      // Exchanges move to a second row (`order-last basis-full` below) so nothing scrolls or
+      // clips. Below `sm`, secondary info (ticker count) is hidden and spacing tightens.
+      // The dropdowns render in a portal (`useAnchoredMenu`), so this layout doesn't affect them.
+      className="sticky top-0 z-10 flex h-[var(--header-h)] flex-wrap content-center items-center gap-x-2
+                 gap-y-3 border-b border-border bg-surface-marketing px-4
+                 sm:gap-x-3 md:gap-x-4 md:px-8 xl:gap-x-6"
     >
       {/* Brand (presentational) */}
       <div className="flex items-center gap-[11px]">
         <span className="h-[14px] w-[14px] rotate-45 rounded-[2px] bg-accent" />
-        <span className="font-mono text-[15px] font-medium tracking-[0.24em] text-text-strong">
+        <span className="hidden font-mono text-[15px] font-medium tracking-[0.24em] text-text-strong md:inline">
           SCREENER
         </span>
       </div>
 
-      <span className="h-[22px] w-px bg-border" />
+      <span className="hidden h-[22px] w-px bg-border sm:block" />
 
-      {/* Watchlist context (display only) */}
-      <div className="flex items-baseline gap-2">
-        <span className="text-[13px] text-text-secondary">{t('header.watchlist')}</span>
+      {/* Watchlist context (display only; hidden on phone widths) */}
+      <div className="hidden items-baseline gap-2 whitespace-nowrap sm:flex">
+        <span className="hidden text-[13px] text-text-secondary xl:inline">{t('header.watchlist')}</span>
         <span className="font-mono text-[11px] tracking-[0.06em] text-text-muted">
           {t('header.tickers', { n: tickerCount })}
         </span>
       </div>
 
-      <span className="h-[22px] w-px bg-border" />
+      <span className="hidden h-[22px] w-px bg-border lg:block" />
 
-      {/* Sort control (functional) */}
-      <SortMenu sortMode={sortMode} onSortModeChange={onSortModeChange} />
+      {/* Sort + Exchanges. From `lg` up: inline, in their desktop position (inner gap = the
+          header gap). Below `lg`: their own full-width second row, each control taking half. */}
+      <div
+        className="order-last flex min-w-0 basis-full gap-2
+                   lg:order-none lg:basis-auto lg:gap-x-4 xl:gap-x-6"
+      >
+        {/* Sort control (functional) */}
+        <SortMenu sortMode={sortMode} onSortModeChange={onSortModeChange} />
+
+        {/* Per-exchange filter (functional; self-subscribes to the filter store) */}
+        <ExchangeFilterMenu />
+      </div>
 
       <div className="flex-1" />
 
@@ -93,7 +111,7 @@ export function DashboardHeader({
               key={mode}
               type="button"
               onClick={() => onSizeModeChange(mode)}
-              className={`rounded-md px-3 py-[5px] font-mono text-[11px] tracking-[0.04em]
+              className={`rounded-md px-2 py-[5px] font-mono text-[11px] tracking-[0.04em] sm:px-3
                           transition-colors ${
                             active
                               ? 'bg-accent font-semibold text-bg'
@@ -128,7 +146,7 @@ export function DashboardHeader({
         type="button"
         onClick={onLogout}
         disabled={loggingOut}
-        className="rounded-lg border border-border-input px-4 py-2 text-[13px] text-text-secondary
+        className="rounded-lg border border-border-input px-3 py-2 text-[13px] text-text-secondary sm:px-4
                    whitespace-nowrap transition-colors hover:bg-white/5 hover:text-text-strong
                    disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -148,4 +166,4 @@ export function DashboardHeader({
       </button>
     </header>
   );
-}
+});

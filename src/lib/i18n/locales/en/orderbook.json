@@ -20,6 +20,13 @@
       "futuresFirst": "Futures first, then spot"
     }
   },
+  "exchangeFilter": {
+    "label": "Exchanges",
+    "all": "All",
+    "count": "{{n}} of {{total}}",
+    "showAll": "Show all exchanges",
+    "lastOne": "At least one exchange must stay selected"
+  },
   "card": {
     "firstSeen": "First seen {{age}} ago",
     "age": {
@@ -57,7 +64,8 @@
       "authFailed": "Feed unavailable — your session could not be authorized.",
       "accessDenied": "Feed unavailable — an active subscription is required.",
       "waiting": "Waiting for order books…",
-      "connecting": "Connecting…"
+      "connecting": "Connecting…",
+      "filtered": "No order books for the selected exchanges."
     }
   }
 }

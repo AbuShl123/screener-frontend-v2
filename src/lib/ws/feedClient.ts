@@ -2,8 +2,13 @@ import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
 import { filterAnnounced, resetCooldown } from '@/features/orderbook/notifications/cooldown';
 import { filterBySettings } from '@/features/orderbook/notifications/settingsFilter';
-import { isKnownExchange, type Exchange } from '@/features/orderbook/exchanges';
-import type { DepthMessage, FeedMessage, Level } from '@/features/orderbook/types';
+import {
+  isValidExchangeId,
+  MAX_EXCHANGES,
+  useExchangeRegistry,
+  type Exchange,
+} from '@/features/orderbook/exchanges';
+import type { DepthMessage, FeedMessage, Level, Market } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '@/features/settings';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
@@ -214,8 +219,35 @@ function handleRawMessage(raw: unknown): void {
 
 const isMarket = (v: unknown): v is 'SPOT' | 'FUTURES' => v === 'SPOT' || v === 'FUTURES';
 
-/** Exchanges already warned about in dev, so an unregistered exchange warns once, not per tick. */
+/** Exchanges already warned about in dev, so a rejected exchange warns once, not per tick. */
 const warnedExchanges = new Set<string>();
+
+/**
+ * Exchange gate. `/api/exchanges` is the authority (registry), but an exchange can reach the
+ * feed before its metadata does: a well-formed id (`^[A-Z0-9]{1,32}$`) is then accepted and
+ * recorded once as PROVISIONAL (a temporary fallback that also triggers a throttled metadata
+ * refetch). Ids failing the format, or beyond `MAX_EXCHANGES`, are dropped.
+ *
+ * Hot path: a registered exchange costs one own-property lookup; the registry is written only
+ * on a first sighting (or a provisional exchange's first message on a new market).
+ */
+function acceptExchange(id: string, market: Market): boolean {
+  const reg = useExchangeRegistry.getState();
+  const meta = Object.hasOwn(reg.meta, id) ? reg.meta[id] : undefined;
+  if (meta) {
+    if (meta.provisional && !meta.markets.includes(market)) reg.ensureFromFeed(id, market);
+    return true;
+  }
+  if (!isValidExchangeId(id) || reg.ids.length >= MAX_EXCHANGES) {
+    if (config.isDev && !warnedExchanges.has(id)) {
+      warnedExchanges.add(id);
+      console.warn(`[feed] ignoring exchange "${id}" (invalid id or registry full)`);
+    }
+    return false;
+  }
+  reg.ensureFromFeed(id, market);
+  return true;
+}
 
 function dropMalformed(json: unknown): null {
   if (config.isDev) console.warn('[feed] dropping malformed message', json);
@@ -247,7 +279,7 @@ function coerceMessage(json: unknown): FeedMessage | null {
 /**
  * Guard + decode one envelope (doc §3.1). Drops, returning null:
  * - unknown `type`s, SILENTLY — new types ship without a coordinated release (doc §4.2);
- * - exchanges missing from the registry (plan D4), warning once per exchange in dev;
+ * - exchanges rejected by `acceptExchange` (malformed id / registry full), warning once in dev;
  * - malformed envelopes (bad identity fields, `data` neither null nor `{ bids, asks }`).
  */
 function coerceEnvelope(json: unknown): DepthMessage | null {
@@ -259,13 +291,7 @@ function coerceEnvelope(json: unknown): DepthMessage | null {
     return dropMalformed(json);
   }
 
-  if (!isKnownExchange(m.exchange)) {
-    if (config.isDev && !warnedExchanges.has(m.exchange)) {
-      warnedExchanges.add(m.exchange);
-      console.warn(`[feed] ignoring unregistered exchange "${m.exchange}" (add it to exchanges.ts)`);
-    }
-    return null;
-  }
+  if (!acceptExchange(m.exchange, m.market)) return null;
 
   const identity = { type: 'DEPTH', exchange: m.exchange, market: m.market, symbol: m.symbol } as const;
   if (m.data === null) return { ...identity, data: null };
@@ -334,12 +360,13 @@ function flush(): void {
   const batch = buffer;
   buffer = [];
   const candidates = useOrderbookStore.getState().applyMessages(batch);
-  // Push-boundary filter: drop muted / below-minTier candidates BEFORE cooldown, so they
-  // never write a cooldown entry (un-muting later lets that order announce fresh) and the
-  // `N NEW` unread counter stays honest. Building the Set per flush is negligible — `muted`
-  // is a handful of entries and `filterBySettings` early-returns when nothing is configured.
-  const { minTier, muted } = useNotificationSettingsStore.getState();
-  const allowed = filterBySettings(candidates, minTier, new Set(muted));
+  // Push-boundary filter: drop muted-ticker / muted-venue / below-minTier candidates BEFORE
+  // cooldown, so they never write a cooldown entry (un-muting later lets that order announce
+  // fresh) and the `N NEW` unread counter stays honest. Building the Sets per flush is
+  // negligible — both lists are a handful of entries and `filterBySettings` early-returns
+  // when nothing is configured. The order book itself was already written above, unfiltered.
+  const { minTier, muted, mutedVenues } = useNotificationSettingsStore.getState();
+  const allowed = filterBySettings(candidates, minTier, new Set(muted), new Set(mutedVenues));
   // Drop repeats of a still-in-cooldown order (top-5 churn re-raises identical levels).
   const fresh = filterAnnounced(allowed);
   if (fresh.length) useNotificationStore.getState().push(fresh);

@@ -1,8 +1,8 @@
 /**
  * Thin, synchronous localStorage layer for the notification settings (minimum tier +
- * muted tickers). Mirrors [`auth/storage.ts`](../auth/storage.ts): every access is
- * try/catch-guarded so disabled/private-mode storage can never crash boot, and the
- * store can hydrate synchronously before React mounts (the feed client reads settings
+ * muted tickers + muted venues). Mirrors [`auth/storage.ts`](../auth/storage.ts): every
+ * access is try/catch-guarded so disabled/private-mode storage can never crash boot, and
+ * the store can hydrate synchronously before React mounts (the feed client reads settings
  * via `getState()` on the hot path — see the module plan §3).
  *
  * Settings are device-level, not per-user: they persist across logout/login on the same
@@ -12,14 +12,18 @@
 const KEYS = {
   minTier: 'screener.settings.minTier',
   mutedTickers: 'screener.settings.mutedTickers', // JSON string[] of bookKey() values
+  mutedVenues: 'screener.settings.mutedVenues', // JSON string[] of venueKey() values
 } as const;
 
 export interface StoredSettings {
   minTier: number; // 1–4, the full tier range (doc §3.5: tier 0 does not exist)
   muted: string[]; // bookKey(symbol, market) values
+  // venueKey(exchange, market) values (`EXCHANGE_MARKET`). Stores the MUTED set, so a venue
+  // that appears later (a new exchange or market) is unmuted by default.
+  mutedVenues: string[];
 }
 
-const DEFAULTS: StoredSettings = { minTier: 1, muted: [] };
+const DEFAULTS: StoredSettings = { minTier: 1, muted: [], mutedVenues: [] };
 
 /** Clamp an unknown value to an integer tier in [1, 4]; falls back to 1. */
 function clampTier(raw: unknown): number {
@@ -28,22 +32,27 @@ function clampTier(raw: unknown): number {
   return Math.min(4, Math.max(1, Math.trunc(n)));
 }
 
+/** Parse a JSON string[]: drop non-strings, dedupe; anything malformed → []. */
+function readStringList(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return [...new Set(parsed.filter((v): v is string => typeof v === 'string'))];
+  } catch {
+    return [];
+  }
+}
+
 /** Returns baked-in defaults on any missing/malformed value — never throws. */
 export function loadSettings(): StoredSettings {
   try {
-    const minTier = clampTier(localStorage.getItem(KEYS.minTier));
-
-    let muted: string[] = [];
-    const rawMuted = localStorage.getItem(KEYS.mutedTickers);
-    if (rawMuted) {
-      const parsed: unknown = JSON.parse(rawMuted);
-      if (Array.isArray(parsed)) {
-        // Coerce to string[]: drop non-strings, dedupe.
-        muted = [...new Set(parsed.filter((v): v is string => typeof v === 'string'))];
-      }
-    }
-
-    return { minTier, muted };
+    return {
+      minTier: clampTier(localStorage.getItem(KEYS.minTier)),
+      muted: readStringList(KEYS.mutedTickers),
+      mutedVenues: readStringList(KEYS.mutedVenues),
+    };
   } catch {
     return { ...DEFAULTS };
   }
@@ -54,6 +63,7 @@ export function saveSettings(s: StoredSettings): void {
   try {
     localStorage.setItem(KEYS.minTier, String(s.minTier));
     localStorage.setItem(KEYS.mutedTickers, JSON.stringify(s.muted));
+    localStorage.setItem(KEYS.mutedVenues, JSON.stringify(s.mutedVenues));
   } catch {
     // Storage unavailable — settings behave as in-memory for this session only.
   }

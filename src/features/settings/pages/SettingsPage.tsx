@@ -59,7 +59,8 @@ export function SettingsPage() {
 
   return (
     <AccountLayout>
-      <div className="flex max-w-[1100px] flex-col gap-5 p-10">
+      {/* Padding tightens below `sm` so the cards keep a usable width; `sm`+ is unchanged. */}
+      <div className="flex max-w-[1100px] flex-col gap-5 p-4 sm:p-10">
         {/* Header */}
         <div>
           <div className="font-sans text-[27px] font-semibold tracking-[-0.01em] text-text">
@@ -69,7 +70,7 @@ export function SettingsPage() {
         </div>
 
         {/* Sticky scroll-spy tab bar (bleeds to the container edges via negative margin) */}
-        <div className="sticky top-0 z-[6] -mx-10 -mt-2 bg-bg px-10 pt-2">
+        <div className="sticky top-0 z-[6] -mx-4 -mt-2 bg-bg px-4 pt-2 sm:-mx-10 sm:px-10">
           <div className="flex gap-1 border-b border-border-subtle">
             <TabButton
               label={t('modal.nav.rules')}
@@ -87,7 +88,8 @@ export function SettingsPage() {
         {/* Classification rules card */}
         <div
           ref={rulesRef}
-          className="flex flex-col gap-6 rounded-[10px] border border-border bg-input px-[26px] pb-[26px] pt-6"
+          className="flex flex-col gap-6 rounded-[10px] border border-border bg-input px-4 pb-5 pt-5
+                     sm:px-[26px] sm:pb-[26px] sm:pt-6"
         >
           <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
             {t('modal.nav.rules')}
@@ -110,7 +112,8 @@ export function SettingsPage() {
         {/* Notifications card */}
         <div
           ref={notifsRef}
-          className="flex flex-col gap-6 rounded-[10px] border border-border bg-input px-[26px] pb-[26px] pt-6"
+          className="flex flex-col gap-6 rounded-[10px] border border-border bg-input px-4 pb-5 pt-5
+                     sm:px-[26px] sm:pb-[26px] sm:pt-6"
         >
           <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-muted">
             {t('modal.nav.notifications')}
