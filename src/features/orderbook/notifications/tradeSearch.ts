@@ -1,5 +1,4 @@
 import {
-  baseAsset,
   fmtBaseQty,
   fmtMoney,
   fmtSymbol,
@@ -23,7 +22,7 @@ function haystack(t: TradeAlert): string {
     t.market, //                            'FUTURES' / 'SPOT'
     String(Math.round(t.notional)), //      '612455'
     fmtMoney(t.notional), //                '$612.5K'
-    fmtBaseQty(t.qty) + ' ' + baseAsset(t.symbol), // '4.38K SOL'
+    fmtBaseQty(t.qty), //                   '4.38K'
     t.avgPrice.toFixed(dec),
     t.firstPrice.toFixed(dec),
     t.lastPrice.toFixed(dec),

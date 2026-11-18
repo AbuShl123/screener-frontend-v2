@@ -71,11 +71,6 @@ export function fmtBaseQty(q: number): string {
   return q.toFixed(4);
 }
 
-/** The base asset of a symbol (`SOLUSDT` → `SOL`), via the same quote split as `fmtSymbol`. */
-export function baseAsset(symbol: string): string {
-  return fmtSymbol(symbol).split('/')[0];
-}
-
 /** Decimal places a number prints with (`139.83` → 2). Exponent notation → `null` (unknown). */
 function printedDecimals(v: number): number | null {
   const s = String(v);

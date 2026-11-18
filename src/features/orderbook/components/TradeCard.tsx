@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  baseAsset,
   fmtBaseQty,
   fmtClock,
   fmtMoney,
@@ -55,7 +54,8 @@ export const TradeCard = memo(function TradeCard({ trade: t, sizeMode }: TradeCa
 
   const dec = tradePriceDecimals(t.firstPrice, t.lastPrice);
   const money = fmtMoney(t.notional);
-  const qty = fmtBaseQty(t.qty) + ' ' + baseAsset(t.symbol);
+  // No base-asset suffix: the ticker is already on the card.
+  const qty = fmtBaseQty(t.qty);
   const relative = tradeRelativeSize(t.notional, t.threshold);
   const bucket = tradeSizeBucket(relative);
   const relLabel = tr('trade.relative.label', {
