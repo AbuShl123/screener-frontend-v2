@@ -11,8 +11,8 @@ no SSR meta-framework.
 
 **Current state:** auth (register → verify-email → login → session bootstrap → route guards →
 logout), the live multi-exchange order book dashboard (WS feed → Zustand store → masonry of cards
-merging every exchange's rows + sort menu + per-exchange filter + notifications panel +
-cooldown-deduped alerts), the backend-driven exchange registry (`GET /api/exchanges`),
+merging every exchange's rows + sort menu + per-exchange filter + a two-tab notifications panel:
+cooldown-deduped depth alerts and large-trade alerts), the backend-driven exchange registry (`GET /api/exchanges`),
 classification rules CRUD, client-side notification preferences (minimum tier + muted tickers +
 muted exchange/market venues), the public landing page, the full payment/monetization flow
 (plan catalog → checkout redirect → polling-based payment status → account page + billing history),
@@ -31,14 +31,16 @@ code changes. Don't reintroduce Binance-only or fixed-exchange-list assumptions.
 touching the order book, notifications or the Settings pickers.**
 
 The backend's revised (breaking) contracts live in [`.claude/docs/changes/`](.claude/docs/changes/).
-Each file there **supersedes** the same-named doc in `.claude/docs/`:
+Each file there **supersedes** the same-named doc in `.claude/docs/`, **except the WebSocket feed**:
 
-- [`changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md): a protocol
-  rewrite, not a field addition. `ADD`/`UPDATE`/`DROP` are replaced by one `DEPTH` type in an
-  envelope `{ type, exchange, market, symbol, data }`, where `data: null` removes the book.
+- [`websocket-feed-api.md`](.claude/docs/websocket-feed-api.md) (the top-level one, **not**
+  `changes/`, which is now a superseded copy): one `DEPTH` type in an envelope
+  `{ type, exchange, market, symbol, data }`, where `data: null` removes the book.
   `SNAPSHOT.data` is an array of those same envelopes. Levels are **positional tuples**
   `[price, quantity, tier, firstSeenMillis, distance]`, tiers are **1–4 only**, a side holds
   **0–5** levels, `seq` is gone, and unknown `type`s must be ignored. `exchange` is an **open set**.
+  It also carries **`TRADE`** (large-trade alerts, §3.8): events, not state — merged by `id`,
+  sorted by exchange `time`, never cleared by a `SNAPSHOT` (which replays the latest 100).
 - [`changes/ticker-list-api.md`](.claude/docs/changes/ticker-list-api.md): `GET /api/tickers`
   returns `{ total, byVenue, instruments: [{ id, venue, symbol }] }`. `venue` is `EXCHANGE_MARKET`
   (split on the **last** underscore); `id` is debug-only and must never be keyed on or stored.
@@ -152,6 +154,8 @@ useOrderbookStore (Zustand, OUTSIDE React) ──► React UI subscribes selecti
 cooldown.ts (dedup by exchange:symbol:market:side:price:tier, 5 min window)
     ▼
 useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / NotificationHandle
+
+  (same flush, independently) TRADE + SNAPSHOT.trades ──► useTradeStore.ingest() ──► the panel's trades tab
 ```
 
 - Live order book state lives in `useOrderbookStore` (`src/stores/orderbookStore.ts`); the feed
@@ -176,6 +180,15 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
   flush's `applyMessages()` return value (raised notifications) is deduped by `cooldown.ts` (top-5
   churn would otherwise re-announce a resting order every time it re-enters/exits the window) and
   pushed into `useNotificationStore`, entirely decoupled from React rendering.
+- **Large-trade alerts** (`TRADE`, doc §3.8) skip the order book entirely: the guard splits a
+  `SNAPSHOT`'s mixed entries into `data` (depth) and `trades`, and each flush hands the batch to
+  `useTradeStore.ingest()` (`src/stores/tradeStore.ts`). Trades are history, not state: merged by
+  `id`, sorted by exchange `time` (then `id`; arrival order is detection order), capped at 500,
+  **never cleared by a snapshot**. Unread is a `seq > readSeq` watermark rather than
+  `notificationStore`'s newest-N prefix (a late alert can sort below newer ones); snapshot
+  replays get `seq: 0`, so they never count as new. "Clear all" remembers the cleared ids so the
+  next snapshot doesn't bring them back. **Settings mutes and the minimum tier do NOT apply to
+  trades** — only the header exchange filter hides them (display time). No toasts/sounds yet.
 - The order book grid itself is expected to eventually bypass React's reconciliation for its
   hottest updates (virtualized DOM first, canvas if profiling demands it) — not yet needed at
   current scale.
@@ -192,7 +205,7 @@ spinner) merged with live API data once it resolves.
 | Surface | State ownership | Library |
 |---|---|---|
 | Order book (real-time) | Store outside React, written by the WebSocket client | Zustand |
-| Notifications (real-time) | Store outside React, written by the flush pipeline (not the socket directly) | Zustand |
+| Notifications + trade alerts (real-time) | Stores outside React, written by the flush pipeline (not the socket directly) | Zustand |
 | Exchange registry | Store outside React, filled from `GET /api/exchanges` (TanStack Query), its localStorage cache and a bundled seed | Zustand |
 | Client preferences (exchange filter, notification settings) | Stores outside React, hydrated from and persisted to localStorage; no backend | Zustand |
 | REST / server state (rules, billing, auth profile) | TanStack Query cache | `@tanstack/react-query` |
@@ -205,7 +218,7 @@ src/
   config/      env.ts — the single validated config source, read by nothing else via import.meta.env
   lib/         shared infra: queryClient.ts, api/ (auth-agnostic REST client), ws/feedClient.ts (socket singleton)
   app/         app shell: routed guards + bootstrap gate (SessionGate, ProtectedRoute, PublicRoute, AdminRoute)
-  stores/      real-time state that lives OUTSIDE React — orderbookStore, notificationStore
+  stores/      real-time state that lives OUTSIDE React — orderbookStore, notificationStore, tradeStore
   features/    feature modules: auth, orderbook (dashboard), billing (plans/checkout/account), settings
                (classification rules + notification prefs), admin (analytics + users), landing
   components/  shared UI primitives (Button, TextField, PasswordField, Card, Banner, BrandMark, …) + layouts/
@@ -318,12 +331,23 @@ components or pages.
   `exchange:symbol:market:side:price:tier`, 5-minute window, so top-5-window churn doesn't spam repeat
   alerts for the same resting order.
 - **`notifications/notificationSearch.ts`** — the panel's substring search over exchange label,
-  ticker, side, market and both raw and formatted numbers.
+  ticker, side, market and both raw and formatted numbers. `notifications/tradeSearch.ts` is the
+  trades-tab counterpart.
+- **`notifications/useUnreadCounts.ts`** — `useDepthUnread()` / `useTradeUnread()`, the visible
+  unread counts shared by the handle badges and the tab chips.
+- **Notification panel tabs:** `NotificationPanel` has two tabs, order book (depth) and large
+  trades; `DashboardPage` owns the active tab next to `notifOpen`, because each of the two
+  collapsed handles (`NotificationHandle`: depth ladder + lightning) opens the panel on its own
+  tab. While the panel is open on a tab, that stream's store is told it's being viewed
+  (`setViewing`) and counts nothing as unread, so only an inactive tab shows a chip (hidden at
+  0); the shared search and "Clear all" act on the active tab. `TradeCard` (memoized — alerts never change) renders a
+  trade: headline size following the QTY/$ toggle, a 4-pip `notional / threshold` meter, the
+  taker-side badge and, for sweeps (`levels > 1`), the first → last price path with its impact.
 - **`tiers.ts`** — the tier→color scale (indexed by tier, index 0 an unused placeholder) shared by
   order book bars, notification stripes and the Settings minimum-tier control; these are data-viz
   values for this surface, not design-system theme tokens.
 - Components (`DashboardHeader`, `SortMenu`, `ExchangeFilterMenu`, `OrderbookCard`,
-  `NotificationPanel`, `NotificationHandle`, `NotificationCard`, `ExchangeLogo`) are conventional
+  `NotificationPanel`, `NotificationHandle`, `NotificationCard`, `TradeCard`, `ExchangeLogo`) are conventional
   React reading from the stores via selectors — see `DashboardPage.tsx` for how the page composes
   them.
 - **Header layout:** `--header-h` on `DashboardPage`'s root is the single source of the header's
@@ -394,7 +418,7 @@ list change together:
   registry exchange × **that exchange's own markets** via `venueOptions.ts`, so a Spot-only or
   Futures-only exchange gets one row; persisted as the *muted* set and never pruned, so new venues
   start unmuted and a temporarily unlisted venue keeps its mute). Venue mutes are notifications-only: dropped at the push boundary and hidden at
-  display time (panel, `N NEW`, handle badge); the grid and the header exchange filter ignore them. **Client-side
+  display time (panel, tab chip, handle badge); the grid and the header exchange filter ignore them. **Client-side
   only** (persisted to localStorage via `storage.ts`, no backend endpoint). The store is
   framework-agnostic (plain Zustand `create`, no React coupling) and hydrated at module load
   specifically so `feedClient.ts` can read it synchronously via `getState()` on the flush hot path
@@ -411,9 +435,10 @@ and the pool is de-duplicated by `(symbol, market)` since rules and mutes are ex
 2. **Order book** — ✅ built (flagship, performance-critical). Live, continuously-updated order
    books merged across every backend-listed exchange (Binance, MEXC, Bybit today); detects
    meaningful changes (new/removed significant orders) and surfaces them as notifications, with a
-   sort menu, a per-exchange display filter and per-user mute/tier filtering (see Settings below). Spoken/TTS
-   alerts are not yet implemented. Governed by the real-time architecture above. Socket protocol:
-   [`.claude/docs/changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md).
+   sort menu, a per-exchange display filter and per-user mute/tier filtering (see Settings below),
+   plus a large-trade alerts tab (`TRADE`). Spoken/TTS alerts and toasts are not yet implemented.
+   Governed by the real-time architecture above. Socket protocol:
+   [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md).
 3. **Classification rules** — ✅ built. Per-user CRUD for the tier thresholds that drive how order
    book levels are ranked/highlighted. Conventional forms-and-data work validated against backend
    rules (client-side mirror in `rulesValidation.ts`).
@@ -431,8 +456,9 @@ and the pool is de-duplicated by `(symbol, market)` since rules and mutes are ex
 
 - [`.claude/docs/auth-api.md`](.claude/docs/auth-api.md) — full auth API contract.
 - [`.claude/docs/websocket-feed-api.md`](.claude/docs/websocket-feed-api.md) — the `/ws` socket
-  protocol: connection, token-as-query-param, every message type and payload shape. Its message
-  format is **superseded** by [`changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md).
+  protocol: connection, token-as-query-param, every message type (`DEPTH`, `TRADE`, `SNAPSHOT`)
+  and payload shape. **Authoritative**; it supersedes the older
+  [`changes/websocket-feed-api.md`](.claude/docs/changes/websocket-feed-api.md).
 - [`.claude/docs/classification-rule-api.md`](.claude/docs/classification-rule-api.md) — the tier
   model (notional × distance thresholds) and the per-user custom-rule CRUD contract.
 - [`.claude/docs/monetization-api.md`](.claude/docs/monetization-api.md) — endpoint-level contract

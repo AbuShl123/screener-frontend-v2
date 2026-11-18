@@ -15,7 +15,11 @@ import { useExchangeFilterStore } from '@/features/orderbook/exchangeFilterStore
 import { DashboardHeader } from '@/features/orderbook/components/DashboardHeader';
 import { OrderbookCard } from '@/features/orderbook/components/OrderbookCard';
 import { NotificationHandle } from '@/features/orderbook/components/NotificationHandle';
-import { NotificationPanel, PANEL_WIDTH } from '@/features/orderbook/components/NotificationPanel';
+import {
+  NotificationPanel,
+  PANEL_WIDTH,
+  type NotificationTab,
+} from '@/features/orderbook/components/NotificationPanel';
 import { useOrderbookFeed } from '@/features/orderbook/useOrderbookFeed';
 import { useExchangeMetadata } from '@/features/orderbook/exchangeMetadata';
 import { sortKeys, type SortMode } from '@/features/orderbook/sortOrderbooks';
@@ -63,6 +67,8 @@ export function DashboardPage() {
   // right padding. Default open to match the template on wide screens; on narrow ones the
   // panel would overlay the grid, so it starts closed there.
   const [notifOpen, setNotifOpen] = useState(() => matchesMedia(WIDE_QUERY));
+  // Owned here too: each collapsed handle opens the panel on its own tab.
+  const [notifTab, setNotifTab] = useState<NotificationTab>('depth');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const keys = useOrderbookStore((s) => s.keys);
   const status = useOrderbookStore((s) => s.status);
@@ -121,7 +127,14 @@ export function DashboardPage() {
   // per-flush re-renders (importance sort subscribes the page to `books`).
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
-  const openNotifications = useCallback(() => setNotifOpen(true), []);
+  const openDepthNotifications = useCallback(() => {
+    setNotifTab('depth');
+    setNotifOpen(true);
+  }, []);
+  const openTradeNotifications = useCallback(() => {
+    setNotifTab('trades');
+    setNotifOpen(true);
+  }, []);
   const closeNotifications = useCallback(() => setNotifOpen(false), []);
 
   return (
@@ -185,8 +198,18 @@ export function DashboardPage() {
       </main>
 
       {/* Fixed-position overlays — siblings of `<main>`, not inside the grid. */}
-      <NotificationHandle open={notifOpen} onOpen={openNotifications} />
-      <NotificationPanel open={notifOpen} sizeMode={sizeMode} onClose={closeNotifications} />
+      <NotificationHandle
+        open={notifOpen}
+        onOpenDepth={openDepthNotifications}
+        onOpenTrades={openTradeNotifications}
+      />
+      <NotificationPanel
+        open={notifOpen}
+        tab={notifTab}
+        onTabChange={setNotifTab}
+        sizeMode={sizeMode}
+        onClose={closeNotifications}
+      />
       <SettingsModal open={settingsOpen} onClose={closeSettings} />
     </div>
   );

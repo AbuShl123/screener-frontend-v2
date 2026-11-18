@@ -31,7 +31,7 @@ export function filterBySettings(
 
 /**
  * True when the notification's `(exchange, market)` venue is muted. Used at DISPLAY time
- * (panel list, `N NEW`, handle badge) so notifications raised before a venue was muted
+ * (panel list, tab chip, handle badge) so notifications raised before a venue was muted
  * disappear at once and come back on unmute. `mutedVenues` is a handful of entries at most,
  * so `includes` beats building a Set; short-circuits when nothing is muted.
  */

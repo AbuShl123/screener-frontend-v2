@@ -115,9 +115,10 @@ export const useOrderbookStore = create<OrderbookState>((set) => ({
           cloned = true;
           keysChanged = true;
           for (const entry of msg.data) applyDepth(entry, false);
-        } else {
+        } else if (msg.type === 'DEPTH') {
           applyDepth(msg, true);
         }
+        // TRADE messages (and a snapshot's `trades`) belong to `tradeStore`, not this store.
       }
 
       // If nothing mutated, return the same `books` ref so selector subscribers bail.

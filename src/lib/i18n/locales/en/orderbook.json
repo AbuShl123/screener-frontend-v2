@@ -48,15 +48,47 @@
       "dist": "DIST"
     }
   },
+  "trade": {
+    "side": {
+      "buy": "TAKER BUY",
+      "sell": "TAKER SELL"
+    },
+    "metric": {
+      "qty": "QTY",
+      "notional": "NOTIONAL",
+      "avgPrice": "AVG PRICE",
+      "fillPrice": "FILL PRICE",
+      "levels": "LEVELS"
+    },
+    "swept": "SWEPT {{n}} LEVELS",
+    "impact": "IMPACT",
+    "path": "Swept {{n}} levels from {{from}} to {{to}}",
+    "relative": {
+      "label": "{{size}} trade for {{symbol}} ({{ratio}}× threshold)",
+      "notable": "Notable",
+      "large": "Large",
+      "veryLarge": "Very large",
+      "exceptional": "Exceptional"
+    }
+  },
   "panel": {
     "title": "Notifications",
-    "new": "{{n}} NEW",
     "clearAll": "Clear all notifications",
+    "clearTrades": "Clear all trade alerts",
     "collapse": "Collapse",
     "collapseAria": "Collapse notifications",
-    "open": "Open notifications",
+    "openDepth": "Open order book alerts",
+    "openTrades": "Open large trade alerts",
+    "tabs": {
+      "label": "Alert type",
+      "depth": "Order book",
+      "trades": "Large trades",
+      "depthTitle": "Order book alerts",
+      "tradesTitle": "Large trade alerts"
+    },
     "searchPlaceholder": "Search ticker, price, size…",
-    "empty": "No matching notifications"
+    "empty": "No matching notifications",
+    "emptyTrades": "No matching trade alerts"
   },
   "dashboard": {
     "reconnecting": "Reconnecting to the feed…",
