@@ -417,10 +417,11 @@ list change together:
 - **Notification preferences** (`NotificationsSettings.tsx`, `MinimumTierControl.tsx`,
   `MutedTickers.tsx`, `MutedVenues.tsx`, `notificationSettingsStore.ts`) — minimum tier + muted book
   keys + **per-alert-type** muted venues (`venueKey(exchange, market)` = the backend's
-  `EXCHANGE_MARKET`). `MutedVenues` is a table: one row per registry exchange × **that exchange's
-  own markets** via `venueOptions.ts` (a Spot-only or Futures-only exchange gets one row), one
-  checkbox column per type — order book (`mutedVenues`, the pre-trades localStorage key, so old
-  mutes carry over) and trades (`mutedTradeVenues`). Both persist the *muted* set and are never
+  `EXCHANGE_MARKET`). `MutedVenues` is a grid of cards, one per registry exchange, with one row per **that
+  exchange's own markets** via `venueOptions.ts` (a Spot-only or Futures-only exchange gets one
+  row) and one toggle button per type — order book (`mutedVenues`, the pre-trades localStorage
+  key, so old mutes carry over) and trades (`mutedTradeVenues`); the card header's switch
+  (`setVenuesMutedAll`) mutes/unmutes every feed of that exchange at once. Both persist the *muted* set and are never
   pruned, so new venues start unmuted and a temporarily unlisted venue keeps its mute. Minimum
   tier and muted tickers are depth-only. Venue mutes are notifications-only: dropped at the push
   boundary and hidden at display time (panel, tab chip, handle badge) by

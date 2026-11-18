@@ -34,6 +34,8 @@ interface NotificationSettingsState {
   unmute(key: string): void;
   /** Mute or unmute one `(exchange, market)` venue for one alert type. */
   setVenueMuted(kind: VenueMuteKind, key: string, muted: boolean): void;
+  /** Mutes/unmutes every alert type for all `keys` at once (the per-exchange switch). */
+  setVenuesMutedAll(keys: readonly string[], muted: boolean): void;
 }
 
 const initial = loadSettings();
@@ -70,6 +72,15 @@ export const useNotificationSettingsStore = create<NotificationSettingsState>((s
       const current = get()[field];
       if (current.includes(key) === muted) return; // already in the requested state
       commit({ [field]: muted ? [...current, key] : current.filter((k) => k !== key) });
+    },
+
+    setVenuesMutedAll(keys, muted) {
+      const apply = (current: string[]) => {
+        const rest = current.filter((k) => !keys.includes(k));
+        return muted ? [...rest, ...keys] : rest;
+      };
+      const { mutedVenues, mutedTradeVenues } = get();
+      commit({ mutedVenues: apply(mutedVenues), mutedTradeVenues: apply(mutedTradeVenues) });
     },
   };
 });

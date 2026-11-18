@@ -34,21 +34,38 @@
     },
     "venues": {
       "heading": "Exchange notifications",
-      "desc": "Choose which alerts each exchange and market sends. Uncheck a box to mute just that type. Order book cards stay visible — this only affects notifications.",
+      "desc": "Click a feed to mute it for that exchange and market; the switch mutes the whole exchange. Order book cards stay visible — this only affects notifications.",
       "count": "{{n}} MUTED",
       "name": "{{exchange}} {{market}}",
       "market": {
         "SPOT": "Spot",
         "FUTURES": "Futures"
       },
-      "columns": {
-        "venue": "Exchange",
-        "depth": "Order book",
-        "trades": "Trades"
-      },
       "toggleAria": {
         "depth": "{{name}} order book notifications",
         "trades": "{{name}} large trade alerts"
+      },
+      "legend": {
+        "depth": "Book · order book alerts",
+        "trades": "Trades · large trade alerts"
+      },
+      "feed": {
+        "depth": "Book",
+        "trades": "Trades"
+      },
+      "status": {
+        "allOn": "ALL FEEDS ON",
+        "allMuted": "ALL MUTED",
+        "some": "{{n}} OF {{total}} MUTED"
+      },
+      "switchAria": "{{exchange}} notifications",
+      "switchTitle": {
+        "mute": "Mute every {{exchange}} feed",
+        "unmute": "Unmute every {{exchange}} feed"
+      },
+      "toggleTitle": {
+        "on": "on · click to mute",
+        "muted": "muted · click to unmute"
       }
     }
   },

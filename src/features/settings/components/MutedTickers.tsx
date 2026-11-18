@@ -91,7 +91,7 @@ export function MutedTickers({ open }: { open: boolean }) {
 
       {/* Search results */}
       {trimmed && (
-        // `@container`: rows switch layout together, by the list's width (see `MutedVenues`).
+        // `@container`: rows switch layout together, by the list's width.
         <div className="@container overflow-hidden rounded-[10px] border border-border-subtle bg-input">
           {results.length > 0 ? (
             results.map((e) => {
