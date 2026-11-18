@@ -120,8 +120,10 @@ export const TradeCard = memo(function TradeCard({ trade: t, sizeMode }: TradeCa
         </span>
       </div>
 
-      {/* Row 3: metrics grid */}
-      <div className="grid grid-cols-3 gap-2.5 border-t border-border-subtle pt-2.5">
+      {/* Row 3: metrics grid. Qty and price size to their content (`auto`) and LEVELS takes
+          the rest, so "157.79K ASTER" stays on one line instead of wrapping in a fixed third;
+          an `auto` track still shrinks (and wraps) if the values can't fit. */}
+      <div className="grid grid-cols-[auto_auto_1fr] gap-x-5 border-t border-border-subtle pt-2.5">
         <Metric
           label={isUsd ? tr('trade.metric.qty') : tr('trade.metric.notional')}
           value={isUsd ? qty : money}
@@ -132,7 +134,7 @@ export const TradeCard = memo(function TradeCard({ trade: t, sizeMode }: TradeCa
         />
         <Metric
           label={tr('trade.metric.levels')}
-          value={isSweep ? String(t.levels) : tr('trade.singleLevel')}
+          value={String(t.levels)}
           align="right"
         />
       </div>

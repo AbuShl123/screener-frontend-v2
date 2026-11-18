@@ -60,7 +60,6 @@
       "fillPrice": "FILL PRICE",
       "levels": "LEVELS"
     },
-    "singleLevel": "1 · single",
     "swept": "SWEPT {{n}} LEVELS",
     "impact": "IMPACT",
     "path": "Swept {{n}} levels from {{from}} to {{to}}",
