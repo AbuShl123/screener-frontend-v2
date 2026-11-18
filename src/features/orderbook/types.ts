@@ -8,7 +8,7 @@ import type { Exchange } from '@/features/orderbook/exchanges';
  * payloads arriving every ~100ms on the perf-critical path. Running every batch
  * through Zod buys little and costs exactly where we can't afford it. The feed
  * client does a cheap structural guard instead (see `lib/ws/feedClient.ts`) and
- * otherwise trusts the documented contract (`.claude/docs/changes/websocket-feed-api.md`).
+ * otherwise trusts the documented contract (`.claude/docs/websocket-feed-api.md`).
  */
 
 export type { Exchange } from '@/features/orderbook/exchanges';
@@ -106,10 +106,54 @@ export interface DepthMessage {
   data: VenueBook | null;
 }
 
+/** The taker's (aggressor's) side of a large trade (doc §3.8.1): BUY consumed asks, SELL bids. */
+export type TradeSide = 'BUY' | 'SELL';
+
+/** A `TRADE` envelope's `data` (doc §3.8): one large executed taker order. Never null. */
+export interface TradeData {
+  id: string; // opaque, stable across reconnects and server restarts — the dedupe key
+  side: TradeSide;
+  time: number; // exchange execution time, epoch ms (NOT detection/arrival time)
+  notional: number; // quote asset (USDT)
+  qty: number; // base asset
+  avgPrice: number; // notional / qty — format before display
+  firstPrice: number;
+  lastPrice: number; // === firstPrice when levels === 1
+  levels: number; // ≥ 1; > 1 = a sweep
+  threshold: number; // the alert's minimum notional; notional / threshold = relative size
+}
+
+/** A decoded `TRADE` envelope (doc §3.8). An event, not state: never updated or removed. */
+export interface TradeMessage {
+  type: 'TRADE';
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  data: TradeData;
+}
+
 /**
- * The decoded messages the store consumes. The feed client's guard has already dropped
+ * A stored trade alert: the envelope flattened, plus `seq`, the client-side arrival number
+ * that drives unread tracking (`tradeStore`). Snapshot replays carry `seq: 0` (always read).
+ */
+export interface TradeAlert extends TradeData {
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  seq: number;
+}
+
+/**
+ * The decoded messages the stores consume. The feed client's guard has already dropped
  * unknown types, exchanges with an invalid id (or beyond the registry cap) and malformed
  * envelopes (live and inside a snapshot), so everything here is known-good. A well-formed
  * exchange id the registry doesn't list yet is kept and recorded as provisional.
+ *
+ * A `SNAPSHOT`'s mixed entries are split by type at decode time: `data` is the depth state
+ * (replaces the order book), `trades` the replayed recent alerts (merged by id, never counted
+ * as unread).
  */
-export type FeedMessage = { type: 'SNAPSHOT'; data: DepthMessage[] } | DepthMessage;
+export type FeedMessage =
+  | { type: 'SNAPSHOT'; data: DepthMessage[]; trades: TradeMessage[] }
+  | DepthMessage
+  | TradeMessage;

@@ -8,17 +8,25 @@ import {
   useExchangeRegistry,
   type Exchange,
 } from '@/features/orderbook/exchanges';
-import type { DepthMessage, FeedMessage, Level, Market } from '@/features/orderbook/types';
+import type {
+  DepthMessage,
+  FeedMessage,
+  Level,
+  Market,
+  TradeMessage,
+} from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '@/features/settings';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
+import { useTradeStore } from '@/stores/tradeStore';
 
 /**
  * The `/ws` feed client: a small singleton state machine (not a class hierarchy)
  * that owns the socket, reconnection, and message coalescing. Framework-agnostic
  * — no React imports — exactly like `session.ts`. It reads tokens synchronously
  * from `useSession.getState()` (why tokens live in Zustand) and writes books into
- * `useOrderbookStore`. Protocol: `.claude/docs/changes/websocket-feed-api.md`.
+ * `useOrderbookStore` and large-trade alerts into `useTradeStore`.
+ * Protocol: `.claude/docs/websocket-feed-api.md`.
  *
  * Public API is two idempotent functions; `useOrderbookFeed` drives them from a
  * React effect.
@@ -67,6 +75,7 @@ export function stopFeed(): void {
   // Drop this session's notifications so logout / unmount doesn't leak them into the
   // next session (plan §6c). Harmless under StrictMode's mount→unmount→mount.
   useNotificationStore.getState().clear();
+  useTradeStore.getState().reset();
   // Forget cooldown history too, so the next session isn't silenced by the last one's.
   resetCooldown();
   if (ws) {
@@ -264,13 +273,18 @@ function coerceMessage(json: unknown): FeedMessage | null {
   const m = json as Record<string, unknown>;
 
   if (m.type === 'SNAPSHOT') {
+    // Entries mix types in no particular order (doc §3.2); split them so the order book
+    // store gets the depth state and the trade store the replayed alerts.
     const entries = Array.isArray(m.data) ? m.data : [];
     const data: DepthMessage[] = [];
+    const trades: TradeMessage[] = [];
     for (const entry of entries) {
-      const depth = coerceEnvelope(entry);
-      if (depth) data.push(depth);
+      const env = coerceEnvelope(entry);
+      if (!env) continue;
+      if (env.type === 'DEPTH') data.push(env);
+      else trades.push(env);
     }
-    return { type: 'SNAPSHOT', data };
+    return { type: 'SNAPSHOT', data, trades };
   }
 
   return coerceEnvelope(json);
@@ -280,18 +294,21 @@ function coerceMessage(json: unknown): FeedMessage | null {
  * Guard + decode one envelope (doc §3.1). Drops, returning null:
  * - unknown `type`s, SILENTLY — new types ship without a coordinated release (doc §4.2);
  * - exchanges rejected by `acceptExchange` (malformed id / registry full), warning once in dev;
- * - malformed envelopes (bad identity fields, `data` neither null nor `{ bids, asks }`).
+ * - malformed envelopes (bad identity fields, `DEPTH` data neither null nor `{ bids, asks }`,
+ *   `TRADE` data missing a required field).
  */
-function coerceEnvelope(json: unknown): DepthMessage | null {
+function coerceEnvelope(json: unknown): DepthMessage | TradeMessage | null {
   if (typeof json !== 'object' || json === null) return dropMalformed(json);
   const m = json as Record<string, unknown>;
 
-  if (m.type !== 'DEPTH') return null;
+  if (m.type !== 'DEPTH' && m.type !== 'TRADE') return null;
   if (typeof m.exchange !== 'string' || typeof m.symbol !== 'string' || !isMarket(m.market)) {
     return dropMalformed(json);
   }
 
   if (!acceptExchange(m.exchange, m.market)) return null;
+
+  if (m.type === 'TRADE') return coerceTrade(json, m.exchange, m.market, m.symbol, m.data);
 
   const identity = { type: 'DEPTH', exchange: m.exchange, market: m.market, symbol: m.symbol } as const;
   if (m.data === null) return { ...identity, data: null };
@@ -303,6 +320,46 @@ function coerceEnvelope(json: unknown): DepthMessage | null {
   return {
     ...identity,
     data: { bids: decodeLevels(d.bids, m.exchange), asks: decodeLevels(d.asks, m.exchange) },
+  };
+}
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * Guard + decode a `TRADE`'s `data` (doc §3.8). Only the known fields are copied, so any
+ * fields the server adds later are ignored (doc: "ignore fields you don't know"). Alerts are
+ * rare (~1,000/hour at most), so this per-field check costs nothing measurable.
+ */
+function coerceTrade(
+  json: unknown,
+  exchange: Exchange,
+  market: Market,
+  symbol: string,
+  data: unknown,
+): TradeMessage | null {
+  if (typeof data !== 'object' || data === null) return dropMalformed(json);
+  const d = data as Record<string, unknown>;
+  const { id, side, time, notional, qty, avgPrice, firstPrice, lastPrice, levels, threshold } = d;
+  if (
+    typeof id !== 'string' ||
+    (side !== 'BUY' && side !== 'SELL') ||
+    !isNum(time) ||
+    !isNum(notional) ||
+    !isNum(qty) ||
+    !isNum(avgPrice) ||
+    !isNum(firstPrice) ||
+    !isNum(lastPrice) ||
+    !isNum(levels) ||
+    !isNum(threshold)
+  ) {
+    return dropMalformed(json);
+  }
+  return {
+    type: 'TRADE',
+    exchange,
+    market,
+    symbol,
+    data: { id, side, time, notional, qty, avgPrice, firstPrice, lastPrice, levels, threshold },
   };
 }
 
@@ -359,10 +416,13 @@ function flush(): void {
   if (buffer.length === 0) return;
   const batch = buffer;
   buffer = [];
+  // Trade alerts first: they are independent of the order book and of the depth-notification
+  // settings below (mutes and the minimum tier never apply to trades).
+  useTradeStore.getState().ingest(batch);
   const candidates = useOrderbookStore.getState().applyMessages(batch);
   // Push-boundary filter: drop muted-ticker / muted-venue / below-minTier candidates BEFORE
   // cooldown, so they never write a cooldown entry (un-muting later lets that order announce
-  // fresh) and the `N NEW` unread counter stays honest. Building the Sets per flush is
+  // fresh) and the unread counter stays honest. Building the Sets per flush is
   // negligible — both lists are a handful of entries and `filterBySettings` early-returns
   // when nothing is configured. The order book itself was already written above, unfiltered.
   const { minTier, muted, mutedVenues } = useNotificationSettingsStore.getState();

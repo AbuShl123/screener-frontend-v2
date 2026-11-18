@@ -82,8 +82,8 @@ export function NotificationCard({ notification: n, sizeMode }: NotificationCard
   );
 }
 
-/** One stacked label/value cell in the metrics grid. */
-function Metric({
+/** One stacked label/value cell in the metrics grid. Shared with `TradeCard`. */
+export function Metric({
   label,
   value,
   align,

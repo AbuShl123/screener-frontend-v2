@@ -59,6 +59,61 @@ export function fmtQty(q: number): string {
   return q.toFixed(0);
 }
 
+/**
+ * Base-asset quantity of an executed trade (template's `fmtBaseQty`): finer than `fmtQty`,
+ * since a trade's size is a headline figure — `4.38K`, `389.5`, `2.15`, `0.0420`.
+ */
+export function fmtBaseQty(q: number): string {
+  if (q >= 1e6) return (q / 1e6).toFixed(2) + 'M';
+  if (q >= 1e3) return (q / 1e3).toFixed(2) + 'K';
+  if (q >= 100) return q.toFixed(1);
+  if (q >= 1) return q.toFixed(2);
+  return q.toFixed(4);
+}
+
+/** The base asset of a symbol (`SOLUSDT` → `SOL`), via the same quote split as `fmtSymbol`. */
+export function baseAsset(symbol: string): string {
+  return fmtSymbol(symbol).split('/')[0];
+}
+
+/** Decimal places a number prints with (`139.83` → 2). Exponent notation → `null` (unknown). */
+function printedDecimals(v: number): number | null {
+  const s = String(v);
+  if (s.includes('e')) return null;
+  const dot = s.indexOf('.');
+  return dot === -1 ? 0 : s.length - dot - 1;
+}
+
+/**
+ * Decimals for a trade's prices (doc §3.8.6). `firstPrice` / `lastPrice` are exchange prices,
+ * so their printed decimals are never cut; `avgPrice` is computed and gets the same count.
+ * The magnitude rule (`priceDecimals`) is the floor, so a round exchange price (`93760`) still
+ * shows its average with sensible precision. Capped at 8.
+ */
+export function tradePriceDecimals(firstPrice: number, lastPrice: number): number {
+  const d = Math.max(
+    priceDecimals(firstPrice),
+    printedDecimals(firstPrice) ?? 0,
+    printedDecimals(lastPrice) ?? 0,
+  );
+  return Math.min(d, 8);
+}
+
+/** Relative size of a trade alert (doc §3.8.3): `notional / threshold`, always ≥ 1. */
+export function tradeRelativeSize(notional: number, threshold: number): number {
+  return threshold > 0 ? notional / threshold : 1;
+}
+
+/** Relative-size bucket 1–4 (doc §3.8.3 suggestion): `1–2×`, `2–5×`, `5–10×`, `≥ 10×`. */
+export function tradeSizeBucket(relative: number): 1 | 2 | 3 | 4 {
+  return relative >= 10 ? 4 : relative >= 5 ? 3 : relative >= 2 ? 2 : 1;
+}
+
+/** A sweep's price impact as a FRACTION (doc §3.8.2): `|last / first − 1|`. */
+export function tradeImpact(firstPrice: number, lastPrice: number): number {
+  return firstPrice > 0 ? Math.abs(lastPrice / firstPrice - 1) : 0;
+}
+
 /** Distance from mid, formatted from the raw fraction (doc-mandated): `1.23%`. */
 export function fmtDistance(distance: number): string {
   return (distance * 100).toFixed(2) + '%';

@@ -10,11 +10,19 @@ import type { Notification } from '@/features/orderbook/types';
 
 const CAP = 500; // newest-first ring buffer; older than this are evicted (see plan §2 for the rationale)
 
+/**
+ * Whether the panel is open on the depth tab. While it is, arrivals are already on screen, so
+ * `push` doesn't count them as unread. Module-level (not state): nothing renders from it.
+ */
+let viewing = false;
+
 interface NotificationState {
   notifications: Notification[]; // newest at index 0
   unread: number; // count since the panel was last opened
   push(batch: Notification[]): void;
   markRead(): void; // panel-open transition → 0
+  /** The panel opened on / left the depth tab. Entering marks everything read. */
+  setViewing(v: boolean): void;
   clear(): void; // feed stop / session end
 }
 
@@ -27,12 +35,17 @@ export const useNotificationStore = create<NotificationState>((set) => ({
     set((s) => ({
       // batch is oldest→newest (arrival order); reverse so the newest lands at index 0.
       notifications: [...batch].reverse().concat(s.notifications).slice(0, CAP),
-      unread: s.unread + batch.length,
+      unread: viewing ? 0 : s.unread + batch.length,
     }));
   },
 
   markRead() {
     set((s) => (s.unread === 0 ? s : { unread: 0 })); // already 0 → no needless notification
+  },
+
+  setViewing(v) {
+    viewing = v;
+    if (v) useNotificationStore.getState().markRead();
   },
 
   clear() {

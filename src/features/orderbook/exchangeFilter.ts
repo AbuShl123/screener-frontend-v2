@@ -3,6 +3,7 @@ import type {
   Exchange,
   Notification,
   PairBook,
+  TradeAlert,
   VenueBook,
 } from '@/features/orderbook/types';
 import { isVenueMuted } from '@/features/orderbook/notifications/settingsFilter';
@@ -78,5 +79,28 @@ export function countVisibleUnread(
   for (let i = 0; i < end; i++) {
     if (isNotificationVisible(notifications[i], hidden, mutedVenues)) n++;
   }
+  return n;
+}
+
+/**
+ * Whether a trade alert is shown / counted: only the header exchange filter applies. Settings
+ * mutes (tickers, venues) and the minimum tier are for depth notifications only.
+ */
+export function isTradeVisible(t: Pick<TradeAlert, 'exchange'>, hidden: readonly Exchange[]): boolean {
+  return hidden.length === 0 || !hidden.includes(t.exchange);
+}
+
+/**
+ * Unread visible trade alerts: `seq > readSeq` (see `tradeStore`). The list is sorted by
+ * exchange time, not arrival, so unread alerts aren't a prefix — a full pass over at most
+ * a few hundred entries, run only when the trade store or the filter changes.
+ */
+export function countUnreadTrades(
+  trades: readonly TradeAlert[],
+  readSeq: number,
+  hidden: readonly Exchange[],
+): number {
+  let n = 0;
+  for (const t of trades) if (t.seq > readSeq && isTradeVisible(t, hidden)) n++;
   return n;
 }

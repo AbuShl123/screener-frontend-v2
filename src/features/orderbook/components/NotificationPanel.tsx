@@ -1,13 +1,18 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotificationCard } from '@/features/orderbook/components/NotificationCard';
+import { TradeCard } from '@/features/orderbook/components/TradeCard';
+import { DepthIcon, TradeIcon } from '@/features/orderbook/components/alertIcons';
 import { matches } from '@/features/orderbook/notifications/notificationSearch';
-import { countVisibleUnread, isNotificationVisible } from '@/features/orderbook/exchangeFilter';
+import { matchesTrade } from '@/features/orderbook/notifications/tradeSearch';
+import { useDepthUnread, useTradeUnread } from '@/features/orderbook/notifications/useUnreadCounts';
+import { isNotificationVisible, isTradeVisible } from '@/features/orderbook/exchangeFilter';
 import { useExchangeFilterStore } from '@/features/orderbook/exchangeFilterStore';
 import { useExchangeRegistry } from '@/features/orderbook/exchanges';
 import { useNotificationSettingsStore } from '@/features/settings';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useTradeStore } from '@/stores/tradeStore';
 
 /**
  * Panel width in px. Single source for both the panel's own width and the right padding
@@ -16,8 +21,14 @@ import { useNotificationStore } from '@/stores/notificationStore';
  */
 export const PANEL_WIDTH = 340;
 
+/** The panel's alert streams, one tab each (spikes / clusters will join here later). */
+export type NotificationTab = 'depth' | 'trades';
+
 interface NotificationPanelProps {
   open: boolean;
+  /** The active tab. Owned by `DashboardPage`, because each handle opens the panel on its tab. */
+  tab: NotificationTab;
+  onTabChange: (tab: NotificationTab) => void;
   sizeMode: SizeMode;
   onClose: () => void;
 }
@@ -26,44 +37,69 @@ interface NotificationPanelProps {
  * The slide-out notifications rail (design template "Dashboard Page Template - Final").
  * Always mounted; slides via `transform` so it animates both directions and the list
  * isn't rebuilt on every toggle. This is conventional UI (CLAUDE.md), so plain React
- * state is correct — the open/search state is not on the real-time hot path.
+ * state is correct — the search state is not on the real-time hot path.
+ *
+ * Two tabs: order book (depth) notifications and large-trade alerts. The Clear button and the
+ * shared search act on the active tab. The active tab is always read (its arrivals are on
+ * screen), so only an inactive tab's chip can show an unread count.
  *
  * `query` lives here because nothing outside the panel needs it. The panel self-subscribes
- * to the notification store (never via `DashboardPage`, which would re-render the grid on
- * every push — plan §8a).
+ * to the notification and trade stores (never via `DashboardPage`, which would re-render the
+ * grid on every push — plan §8a).
  */
 export const NotificationPanel = memo(function NotificationPanel({
   open,
+  tab,
+  onTabChange,
   sizeMode,
   onClose,
 }: NotificationPanelProps) {
   const { t } = useTranslation('orderbook');
   const [query, setQuery] = useState('');
   const notifications = useNotificationStore((s) => s.notifications);
-  const unread = useNotificationStore((s) => s.unread);
-  const markRead = useNotificationStore((s) => s.markRead);
-  const clear = useNotificationStore((s) => s.clear);
+  const setDepthViewing = useNotificationStore((s) => s.setViewing);
+  const clearDepth = useNotificationStore((s) => s.clear);
+  const trades = useTradeStore((s) => s.trades);
+  const setTradesViewing = useTradeStore((s) => s.setViewing);
+  const clearTrades = useTradeStore((s) => s.clear);
   const hidden = useExchangeFilterStore((s) => s.hidden);
   const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
-  // Cards and the search read exchange labels/logos from the registry non-reactively; this
-  // re-renders them when it changes (metadata arrival — rare).
+  const depthUnread = useDepthUnread();
+  const tradeUnread = useTradeUnread();
+  // Depth cards and the searches read exchange labels/logos from the registry non-reactively;
+  // this re-renders them when it changes (metadata arrival — rare).
   useExchangeRegistry((s) => s.version);
 
-  // Reset unread on each open transition (and on initial mount when default-open).
-  // Depends on `open` only — NOT on `notifications` — so while the panel is open the
-  // header "N NEW" grows to show arrivals-since-open, matching "unread since last opened".
+  // Tell each store whether its stream is on screen. Entering marks it read, and while it stays
+  // on screen the store doesn't count arrivals as unread, so the active tab's count stays 0
+  // (no per-push effect, no flash of a non-zero chip). Unmount → neither is viewed.
   useEffect(() => {
-    if (open) markRead();
-  }, [open, markRead]);
-
-  // Newest-first ordering comes from the store (index 0 is newest) — no sort needed.
-  // The exchange filter applies at DISPLAY time only: hidden exchanges' notifications stay in
-  // the store and reappear as soon as the exchange is shown again. Venue mutes also hide
-  // notifications raised before the mute (new ones are already dropped in the feed flush).
-  const visible = notifications.filter(
-    (n) => isNotificationVisible(n, hidden, mutedVenues) && matches(n, query),
+    setDepthViewing(open && tab === 'depth');
+    setTradesViewing(open && tab === 'trades');
+  }, [open, tab, setDepthViewing, setTradesViewing]);
+  useEffect(
+    () => () => {
+      setDepthViewing(false);
+      setTradesViewing(false);
+    },
+    [setDepthViewing, setTradesViewing],
   );
-  const visibleUnread = countVisibleUnread(notifications, unread, hidden, mutedVenues);
+
+  const isTrades = tab === 'trades';
+
+  // Newest-first ordering comes from the stores — no sort needed. Only the active tab's list
+  // is filtered. Depth: the exchange filter and venue mutes apply at DISPLAY time (hidden
+  // exchanges' notifications stay in the store and reappear when shown again). Trades: only
+  // the exchange filter applies — settings mutes are for depth notifications only.
+  const visibleDepth = isTrades
+    ? []
+    : notifications.filter((n) => isNotificationVisible(n, hidden, mutedVenues) && matches(n, query));
+  const visibleTrades = isTrades
+    ? trades.filter((tr) => isTradeVisible(tr, hidden) && matchesTrade(tr, query))
+    : [];
+  const isEmpty = isTrades ? visibleTrades.length === 0 : visibleDepth.length === 0;
+  const canClear = isTrades ? trades.length > 0 : notifications.length > 0;
+  const clearLabel = isTrades ? t('panel.clearTrades') : t('panel.clearAll');
 
   return (
     <aside
@@ -81,20 +117,17 @@ export const NotificationPanel = memo(function NotificationPanel({
     >
       {/* Header */}
       <div className="flex flex-none items-center justify-between gap-3 border-b border-border px-[18px] py-4">
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-[15px] font-semibold text-text">{t('panel.title')}</span>
-          <span className="font-mono text-[10px] tracking-[0.08em] text-accent">
-            {t('panel.new', { n: visibleUnread })}
-          </span>
-        </div>
+        {/* No `N NEW` here: it counted the active tab, which is always read while shown. */}
+        <span className="text-[15px] font-semibold text-text">{t('panel.title')}</span>
         <div className="flex items-center gap-2">
-          {/* Clear all — deletes every notification (does not affect the cooldown dedup). */}
+          {/* Clear all — empties the ACTIVE tab (depth: does not affect the cooldown dedup;
+              trades: cleared alerts stay out of later snapshot replays). */}
           <button
             type="button"
-            onClick={clear}
-            disabled={notifications.length === 0}
-            title={t('panel.clearAll')}
-            aria-label={t('panel.clearAll')}
+            onClick={isTrades ? clearTrades : clearDepth}
+            disabled={!canClear}
+            title={clearLabel}
+            aria-label={clearLabel}
             className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg
                        border border-border-input text-text-secondary transition-colors
                        hover:bg-white/5 hover:text-danger
@@ -130,7 +163,31 @@ export const NotificationPanel = memo(function NotificationPanel({
         </div>
       </div>
 
-      {/* Search */}
+      {/* Tabs: one per alert stream */}
+      <div
+        role="tablist"
+        aria-label={t('panel.tabs.label')}
+        className="flex flex-none gap-1 border-b border-border-subtle px-[14px]"
+      >
+        <TabButton
+          id="notif-tab-depth"
+          active={!isTrades}
+          onClick={() => onTabChange('depth')}
+          icon={<DepthIcon size={15} />}
+          label={t('panel.tabs.depth')}
+          count={depthUnread}
+        />
+        <TabButton
+          id="notif-tab-trades"
+          active={isTrades}
+          onClick={() => onTabChange('trades')}
+          icon={<TradeIcon size={15} />}
+          label={t('panel.tabs.trades')}
+          count={tradeUnread}
+        />
+      </div>
+
+      {/* Search (shared by both tabs) */}
       <div className="flex-none border-b border-border-subtle px-[14px] py-3">
         <div className="relative flex items-center">
           <svg
@@ -160,13 +217,19 @@ export const NotificationPanel = memo(function NotificationPanel({
       </div>
 
       {/* List (newest at top) */}
-      <div className="scrollbar-slim flex flex-1 flex-col gap-2.5 overflow-y-auto px-[14px] py-[14px]">
-        {visible.length === 0 ? (
+      <div
+        role="tabpanel"
+        aria-labelledby={isTrades ? 'notif-tab-trades' : 'notif-tab-depth'}
+        className="scrollbar-slim flex flex-1 flex-col gap-2.5 overflow-y-auto px-[14px] py-[14px]"
+      >
+        {isEmpty ? (
           <div className="py-7 text-center font-mono text-[12px] tracking-[0.04em] text-text-dim">
-            {t('panel.empty')}
+            {isTrades ? t('panel.emptyTrades') : t('panel.empty')}
           </div>
+        ) : isTrades ? (
+          visibleTrades.map((tr) => <TradeCard key={tr.id} trade={tr} sizeMode={sizeMode} />)
         ) : (
-          visible.map((n) => (
+          visibleDepth.map((n) => (
             <NotificationCard key={n.id} notification={n} sizeMode={sizeMode} />
           ))
         )}
@@ -174,3 +237,51 @@ export const NotificationPanel = memo(function NotificationPanel({
     </aside>
   );
 });
+
+/**
+ * One tab: icon + label + unread chip (only when > 0; the active tab's count is always 0, see
+ * the stores' `setViewing`). Tabs size to their content (`flex-auto`) rather than splitting
+ * equally, and the label never wraps — "Крупные сделки" didn't fit half of the 340px panel.
+ */
+function TabButton({
+  id,
+  active,
+  onClick,
+  icon,
+  label,
+  count,
+}: {
+  id: string;
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  count: number;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={id}
+      aria-selected={active}
+      onClick={onClick}
+      className={`-mb-px inline-flex min-w-0 flex-auto items-center justify-center gap-2 border-b-2 px-1.5
+                  pt-3 pb-[11px] font-sans text-[13px] transition-colors hover:text-text-strong ${
+                    active ? 'border-accent text-text' : 'border-transparent text-text-muted'
+                  }`}
+    >
+      <span className="flex-none">{icon}</span>
+      {/* `truncate` = nowrap + ellipsis, the last resort on a very narrow viewport. */}
+      <span className="min-w-0 truncate">{label}</span>
+      {count > 0 && (
+        <span
+          className="inline-flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full
+                     bg-white/[0.08] px-[5px] font-mono text-[10px] leading-none font-semibold
+                     text-text-secondary"
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </button>
+  );
+}
