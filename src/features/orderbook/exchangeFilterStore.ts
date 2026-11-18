@@ -6,8 +6,9 @@ import {
 } from '@/features/orderbook/exchanges';
 
 /**
- * The dashboard's per-exchange filter: which exchanges are HIDDEN from the grid and the
- * notifications panel. A display-only preference — the feed client never reads it, so every
+ * The dashboard's per-exchange filter: which exchanges' order books are HIDDEN from the grid.
+ * It does NOT touch notifications: depth and trade alerts from a hidden exchange keep flowing
+ * into the notifications panel (per-type mutes live in Settings). A display-only preference — the feed client never reads it, so every
  * exchange's data keeps flowing into the stores and re-showing an exchange is instant (no
  * reconnect, no waiting for a snapshot).
  *

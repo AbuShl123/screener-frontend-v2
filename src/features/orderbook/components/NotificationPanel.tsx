@@ -6,8 +6,7 @@ import { DepthIcon, TradeIcon } from '@/features/orderbook/components/alertIcons
 import { matches } from '@/features/orderbook/notifications/notificationSearch';
 import { matchesTrade } from '@/features/orderbook/notifications/tradeSearch';
 import { useDepthUnread, useTradeUnread } from '@/features/orderbook/notifications/useUnreadCounts';
-import { isNotificationVisible, isTradeVisible } from '@/features/orderbook/exchangeFilter';
-import { useExchangeFilterStore } from '@/features/orderbook/exchangeFilterStore';
+import { isVenueMuted } from '@/features/orderbook/notifications/settingsFilter';
 import { useExchangeRegistry } from '@/features/orderbook/exchanges';
 import { useNotificationSettingsStore } from '@/features/settings';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
@@ -62,8 +61,8 @@ export const NotificationPanel = memo(function NotificationPanel({
   const trades = useTradeStore((s) => s.trades);
   const setTradesViewing = useTradeStore((s) => s.setViewing);
   const clearTrades = useTradeStore((s) => s.clear);
-  const hidden = useExchangeFilterStore((s) => s.hidden);
   const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
+  const mutedTradeVenues = useNotificationSettingsStore((s) => s.mutedTradeVenues);
   const depthUnread = useDepthUnread();
   const tradeUnread = useTradeUnread();
   // Depth cards and the searches read exchange labels/logos from the registry non-reactively;
@@ -88,14 +87,14 @@ export const NotificationPanel = memo(function NotificationPanel({
   const isTrades = tab === 'trades';
 
   // Newest-first ordering comes from the stores — no sort needed. Only the active tab's list
-  // is filtered. Depth: the exchange filter and venue mutes apply at DISPLAY time (hidden
-  // exchanges' notifications stay in the store and reappear when shown again). Trades: only
-  // the exchange filter applies — settings mutes are for depth notifications only.
+  // is filtered. Each tab applies its own per-type venue mutes from Settings at DISPLAY time, so
+  // alerts raised before a mute disappear at once (new ones are dropped in `feedClient`). The
+  // header exchange filter deliberately does NOT apply: it hides order book cards only.
   const visibleDepth = isTrades
     ? []
-    : notifications.filter((n) => isNotificationVisible(n, hidden, mutedVenues) && matches(n, query));
+    : notifications.filter((n) => !isVenueMuted(n, mutedVenues) && matches(n, query));
   const visibleTrades = isTrades
-    ? trades.filter((tr) => isTradeVisible(tr, hidden) && matchesTrade(tr, query))
+    ? trades.filter((tr) => !isVenueMuted(tr, mutedTradeVenues) && matchesTrade(tr, query))
     : [];
   const isEmpty = isTrades ? visibleTrades.length === 0 : visibleDepth.length === 0;
   const canClear = isTrades ? trades.length > 0 : notifications.length > 0;

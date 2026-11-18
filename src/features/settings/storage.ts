@@ -1,6 +1,6 @@
 /**
  * Thin, synchronous localStorage layer for the notification settings (minimum tier +
- * muted tickers + muted venues). Mirrors [`auth/storage.ts`](../auth/storage.ts): every
+ * muted tickers + per-alert-type muted venues). Mirrors [`auth/storage.ts`](../auth/storage.ts): every
  * access is try/catch-guarded so disabled/private-mode storage can never crash boot, and
  * the store can hydrate synchronously before React mounts (the feed client reads settings
  * via `getState()` on the hot path — see the module plan §3).
@@ -12,18 +12,22 @@
 const KEYS = {
   minTier: 'screener.settings.minTier',
   mutedTickers: 'screener.settings.mutedTickers', // JSON string[] of bookKey() values
-  mutedVenues: 'screener.settings.mutedVenues', // JSON string[] of venueKey() values
+  // JSON string[] of venueKey() values. Order book (depth) mutes: the key predates trade alerts,
+  // when venue mutes were depth-only, so it keeps its name and existing mutes carry over as is.
+  mutedVenues: 'screener.settings.mutedVenues',
+  mutedTradeVenues: 'screener.settings.mutedTradeVenues', // JSON string[] of venueKey() values
 } as const;
 
 export interface StoredSettings {
   minTier: number; // 1–4, the full tier range (doc §3.5: tier 0 does not exist)
   muted: string[]; // bookKey(symbol, market) values
-  // venueKey(exchange, market) values (`EXCHANGE_MARKET`). Stores the MUTED set, so a venue
-  // that appears later (a new exchange or market) is unmuted by default.
-  mutedVenues: string[];
+  // venueKey(exchange, market) values (`EXCHANGE_MARKET`), one list per alert type. Both store
+  // the MUTED set, so a venue that appears later (a new exchange or market) is unmuted by default.
+  mutedVenues: string[]; // order book (depth) notifications
+  mutedTradeVenues: string[]; // large-trade alerts
 }
 
-const DEFAULTS: StoredSettings = { minTier: 1, muted: [], mutedVenues: [] };
+const DEFAULTS: StoredSettings = { minTier: 1, muted: [], mutedVenues: [], mutedTradeVenues: [] };
 
 /** Clamp an unknown value to an integer tier in [1, 4]; falls back to 1. */
 function clampTier(raw: unknown): number {
@@ -52,6 +56,7 @@ export function loadSettings(): StoredSettings {
       minTier: clampTier(localStorage.getItem(KEYS.minTier)),
       muted: readStringList(KEYS.mutedTickers),
       mutedVenues: readStringList(KEYS.mutedVenues),
+      mutedTradeVenues: readStringList(KEYS.mutedTradeVenues),
     };
   } catch {
     return { ...DEFAULTS };
@@ -64,6 +69,7 @@ export function saveSettings(s: StoredSettings): void {
     localStorage.setItem(KEYS.minTier, String(s.minTier));
     localStorage.setItem(KEYS.mutedTickers, JSON.stringify(s.muted));
     localStorage.setItem(KEYS.mutedVenues, JSON.stringify(s.mutedVenues));
+    localStorage.setItem(KEYS.mutedTradeVenues, JSON.stringify(s.mutedTradeVenues));
   } catch {
     // Storage unavailable — settings behave as in-memory for this session only.
   }

@@ -1,7 +1,10 @@
 import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
 import { filterAnnounced, resetCooldown } from '@/features/orderbook/notifications/cooldown';
-import { filterBySettings } from '@/features/orderbook/notifications/settingsFilter';
+import {
+  dropMutedTrades,
+  filterBySettings,
+} from '@/features/orderbook/notifications/settingsFilter';
 import {
   isValidExchangeId,
   MAX_EXCHANGES,
@@ -416,16 +419,17 @@ function flush(): void {
   if (buffer.length === 0) return;
   const batch = buffer;
   buffer = [];
-  // Trade alerts first: they are independent of the order book and of the depth-notification
-  // settings below (mutes and the minimum tier never apply to trades).
-  useTradeStore.getState().ingest(batch);
+  const { minTier, muted, mutedVenues, mutedTradeVenues } =
+    useNotificationSettingsStore.getState();
+  // Trade alerts first: they are independent of the order book. Only the trade venue mutes
+  // apply to them (the minimum tier, muted tickers and depth venue mutes never do).
+  useTradeStore.getState().ingest(dropMutedTrades(batch, mutedTradeVenues));
   const candidates = useOrderbookStore.getState().applyMessages(batch);
-  // Push-boundary filter: drop muted-ticker / muted-venue / below-minTier candidates BEFORE
-  // cooldown, so they never write a cooldown entry (un-muting later lets that order announce
-  // fresh) and the unread counter stays honest. Building the Sets per flush is
-  // negligible — both lists are a handful of entries and `filterBySettings` early-returns
+  // Push-boundary filter: drop muted-ticker / depth-muted-venue / below-minTier candidates
+  // BEFORE cooldown, so they never write a cooldown entry (un-muting later lets that order
+  // announce fresh) and the unread counter stays honest. Building the Sets per flush is
+  // negligible — the lists are a handful of entries and `filterBySettings` early-returns
   // when nothing is configured. The order book itself was already written above, unfiltered.
-  const { minTier, muted, mutedVenues } = useNotificationSettingsStore.getState();
   const allowed = filterBySettings(candidates, minTier, new Set(muted), new Set(mutedVenues));
   // Drop repeats of a still-in-cooldown order (top-5 churn re-raises identical levels).
   const fresh = filterAnnounced(allowed);

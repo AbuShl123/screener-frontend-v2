@@ -15,8 +15,9 @@ import type { FeedMessage, TradeAlert, TradeMessage } from '@/features/orderbook
  * keeps a `readSeq` watermark: an alert is unread while `seq > readSeq`. Snapshot replays get
  * `seq: 0`, so a reconnect / rules edit / `SNAPSHOT_REQUEST` never counts as new alerts.
  *
- * Settings mutes (tickers, venues, minimum tier) do NOT apply to trades; only the header's
- * exchange filter hides them, at display time (`exchangeFilter.ts`).
+ * Only the Settings trade venue mutes apply to trades: `feedClient` drops a muted venue's
+ * alerts before `ingest`, and the panel hides already-stored ones (`settingsFilter.ts`). The
+ * minimum tier, muted tickers and the header's exchange filter never apply to them.
  */
 
 /** Keep at most this many alerts (doc §3.8.5: cap the list yourself; the server never removes). */

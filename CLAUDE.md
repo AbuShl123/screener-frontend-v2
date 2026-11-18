@@ -187,8 +187,9 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
   **never cleared by a snapshot**. Unread is a `seq > readSeq` watermark rather than
   `notificationStore`'s newest-N prefix (a late alert can sort below newer ones); snapshot
   replays get `seq: 0`, so they never count as new. "Clear all" remembers the cleared ids so the
-  next snapshot doesn't bring them back. **Settings mutes and the minimum tier do NOT apply to
-  trades** — only the header exchange filter hides them (display time). No toasts/sounds yet.
+  next snapshot doesn't bring them back. **Only the Settings trade venue mutes apply to trades**
+  (`mutedTradeVenues`: dropped before `ingest`, hidden at display time) — muted tickers, the
+  minimum tier and the header exchange filter do not. No toasts/sounds yet.
 - The order book grid itself is expected to eventually bypass React's reconciliation for its
   hottest updates (virtualized DOM first, canvas if profiling demands it) — not yet needed at
   current scale.
@@ -310,9 +311,10 @@ components or pages.
   would hide them all. `hidden` only changes identity when its contents change. A newly listed
   exchange shows by default; the last visible exchange can't be hidden. It reads the registry and
   never writes it. It's **display-only**: the feed client doesn't read it, so all data keeps
-  flowing and re-showing an exchange is instant. The pure helpers apply it to the card merge, the visible-keys
-  selector (`useShallow`, so the page still re-renders only when the visible set changes),
-  importance tier counts, masonry row estimates and the notification panel/handle counts.
+  flowing and re-showing an exchange is instant. It's **order-book-only**: the pure helpers apply
+  it to the card merge, the visible-keys selector (`useShallow`, so the page still re-renders only
+  when the visible set changes), importance tier counts and masonry row estimates — never to the
+  notification panel, its tab chips or the handle badges (alert mutes live in Settings).
 - **`masonry.ts`** — pure column assignment for the dashboard grid: cards dealt in sort order to
   the shortest column by an *estimated* height (rows × row height + chrome). `DashboardPage` holds
   the column count (`ResizeObserver`) and keeps the sorted-keys identity stable across unchanged
@@ -414,11 +416,15 @@ list change together:
   [`.claude/docs/classification-rule-api.md`](.claude/docs/classification-rule-api.md).
 - **Notification preferences** (`NotificationsSettings.tsx`, `MinimumTierControl.tsx`,
   `MutedTickers.tsx`, `MutedVenues.tsx`, `notificationSettingsStore.ts`) — minimum tier + muted book
-  keys + muted venues (`venueKey(exchange, market)` = the backend's `EXCHANGE_MARKET`, one row per
-  registry exchange × **that exchange's own markets** via `venueOptions.ts`, so a Spot-only or
-  Futures-only exchange gets one row; persisted as the *muted* set and never pruned, so new venues
-  start unmuted and a temporarily unlisted venue keeps its mute). Venue mutes are notifications-only: dropped at the push boundary and hidden at
-  display time (panel, tab chip, handle badge); the grid and the header exchange filter ignore them. **Client-side
+  keys + **per-alert-type** muted venues (`venueKey(exchange, market)` = the backend's
+  `EXCHANGE_MARKET`). `MutedVenues` is a table: one row per registry exchange × **that exchange's
+  own markets** via `venueOptions.ts` (a Spot-only or Futures-only exchange gets one row), one
+  checkbox column per type — order book (`mutedVenues`, the pre-trades localStorage key, so old
+  mutes carry over) and trades (`mutedTradeVenues`). Both persist the *muted* set and are never
+  pruned, so new venues start unmuted and a temporarily unlisted venue keeps its mute. Minimum
+  tier and muted tickers are depth-only. Venue mutes are notifications-only: dropped at the push
+  boundary and hidden at display time (panel, tab chip, handle badge) by
+  `orderbook/notifications/settingsFilter.ts`; the grid and the header exchange filter ignore them. **Client-side
   only** (persisted to localStorage via `storage.ts`, no backend endpoint). The store is
   framework-agnostic (plain Zustand `create`, no React coupling) and hydrated at module load
   specifically so `feedClient.ts` can read it synchronously via `getState()` on the flush hot path
