@@ -1,319 +1,518 @@
-# WebSocket Feed API — Realtime Order Book Delivery
+# WebSocket Feed API — `/ws`
 
-> **Audience**: frontend engineers/agents building the live order-book UI against the screener
-> backend. This document is a complete contract reference for the `/ws` endpoint — how to connect,
-> how the token is passed, every message type the server sends, the exact shape of each payload, and
-> how the client should react to each. It is the source of truth for the socket protocol.
+> **Audience**: frontend engineers/agents building the live screener UI. This is the contract for
+> the `/ws` endpoint: how to connect and authenticate, every message the server sends, the exact
+> payload shapes, and how the client should react to each.
 >
-> For obtaining the token in the first place (register/login/refresh), see
-> [`auth-api.md`](./auth-api.md). This doc assumes you already have a valid **access token**.
+> For getting the token (register/login/refresh), see [`auth-api.md`](./auth-api.md). For the list
+> of instruments the screener tracks, see [`ticker-list-api.md`](./ticker-list-api.md).
 
 ---
 
-## 1. What this socket is
+## 1. Overview
 
-A single WebSocket connection that streams **classified order-book levels** for many tickers at once.
-The server pushes; the client (almost) only listens. Every ~100ms the server sends whatever changed
-in that window, per ticker. The client's job is to maintain a local map of
-`(symbol, market) → order book` and re-render it as messages arrive.
+One WebSocket connection carries the whole live feed. The server pushes and the client almost
+only listens.
 
-Each connected user gets the feed shaped by their own classification rules (if they've configured
-any via the rules API); otherwise they get the global default feed. This is transparent to the
-client — the message format is identical either way. You do not opt in or send rule config over the
-socket; it's derived server-side from the authenticated user.
+- About every **100ms** the server sends what changed in that window.
+- Every message is one JSON object in its own text frame, wrapped in a common **envelope**
+  (`type`, instrument identity, `data`). `type` says how to read `data`.
+- On connect, and whenever a resync is needed, the server sends one **`SNAPSHOT`** holding the
+  full current state and the most recent trade alerts. Live messages after it are applied on top.
+- Two data types:
+  - **`DEPTH`**: classified order-book levels (state: a book is upserted and removed).
+  - **`TRADE`**: a large executed trade (an event: it happened once and never changes) (§3.8).
+- Bursts (many same-side trades over seconds), spike alerts and order clusters will arrive later as
+  new `type`s on the same socket. **Clients must ignore types they don't know** (§4.2).
+
+The depth feed only contains books that **currently have at least one notable level** (tier 1–4).
+A tracked instrument with nothing notable near its mid-price isn't in the feed at all, so the feed
+is a *subset* of the universe returned by `GET /api/tickers`. A book enters with a `DEPTH` message
+carrying levels and leaves with a `DEPTH` message whose `data` is `null`.
+
+Each user's feed is shaped by their own classification rules (configured through the rules API),
+or by the global defaults if they have none. The client doesn't see the difference: the message
+format is identical. Nothing about rules is sent over the socket. When the user edits a rule, the
+open socket receives a fresh `SNAPSHOT` with the new tiers automatically; no reconnect is needed.
 
 ---
 
 ## 2. Connecting
 
-### 2.1 Endpoint URL
+### 2.1 URL
 
 ```
 ws(s)://<host>/ws?token=<accessToken>
 ```
 
 - **Local dev**: `ws://localhost:8080/ws?token=<accessToken>`
-- **Production**: `wss://tc-screener.com/ws?token=<accessToken>` (use `wss://` — TLS — in prod)
+- **Production**: `wss://tc-screener.com/ws?token=<accessToken>` (always `wss://` in prod)
 
-There is no `/api` prefix on the socket path. It is exactly `/ws`.
+There is no `/api` prefix. The path is exactly `/ws`.
 
-### 2.2 Authentication — token as a query parameter
+### 2.2 Authentication and access
 
-The access token is passed **as the `token` query parameter on the connection URL**, not as a
-header. This is deliberate: browsers' `WebSocket` constructor does not allow setting custom headers,
-so the standard `Authorization: Bearer` mechanism used for REST is not available at handshake time.
+The token goes in the **`token` query parameter**, because the browser `WebSocket` constructor
+can't set an `Authorization` header.
 
-- Use the **access token** (the JWT from `/api/auth/login` or `/api/auth/refresh`) — the **same**
-  token you send as `Authorization: Bearer` on REST calls. **Not** the refresh token.
-- The server validates the JWT signature and expiry at handshake (`@OnOpen`). On any problem it
-  immediately closes the socket with close code **1008 (VIOLATED_POLICY)**:
-  - Missing `token` param → closed, reason `"Missing token"`.
-  - Invalid or expired token → closed, reason `"Invalid or expired token"`.
-- So a connection that closes with code 1008 right after opening means **auth failed** — refresh the
-  access token and reconnect. Do not retry with the same expired token in a tight loop.
+- Use the **access token** (the JWT from `/api/auth/login` or `/api/auth/refresh`, the one sent as
+  `Authorization: Bearer` on REST calls). **Not** the refresh token.
+- On connect the server validates the token, then checks that the user has **screener access**
+  (an active trial or subscription; admins always pass). If either check fails, the socket is
+  closed immediately with code **1008 (VIOLATED_POLICY)**. The close **reason** tells the cases
+  apart:
+
+| Close reason | Cause | Client action |
+|---|---|---|
+| `"Missing token"` | No `token` query param. | Client bug. Fix the URL. |
+| `"Invalid or expired token"` | Bad signature or expired JWT. | Refresh the access token, then reconnect. If the refresh fails → login. |
+| `"Subscription required"` | Valid token, but the trial/subscription has expired. | **Don't reconnect.** Show the paywall/plans page. Reconnect only after a successful purchase. |
 
 ```js
-const token = getAccessToken(); // your stored JWT
-const ws = new WebSocket(`wss://tc-screener.com/ws?token=${encodeURIComponent(token)}`);
+const ws = new WebSocket(`wss://tc-screener.com/ws?token=${encodeURIComponent(getAccessToken())}`);
 ```
 
-> **Token expiry mid-session**: the token is only checked at connection time. An already-open socket
-> is **not** force-closed the moment the JWT expires — it keeps streaming. But do not rely on that:
-> if you ever need to reconnect (network blip, eviction — see §7), you must reconnect with a
-> **currently valid** token. Best practice: keep the access token fresh (see `auth-api.md` §4.4) so a
-> reconnect always has a good token on hand.
+> **Checks happen only at connect time.** An open socket is not closed when the JWT or the
+> subscription expires mid-session. Don't rely on that: every reconnect (network blip, eviction,
+> deploy) goes through both checks again. Keep the access token fresh (`auth-api.md` §4.4) so a
+> reconnect always has a valid one.
 
-### 2.3 What happens right after a successful connection
+### 2.3 After connecting
 
-You do **nothing**. On the next broadcaster tick (~100ms after connecting) the server automatically
-sends you a full **`SNAPSHOT`** of the current active state. You do not need to send a request for
-the initial snapshot — it is pushed for you. After that, incremental messages (`ADD` / `UPDATE` /
-`DROP`) flow as things change.
+Nothing is required from the client. On the next server tick (~100ms) a full `SNAPSHOT` arrives
+without being requested. Live messages follow.
 
 ---
 
 ## 3. Message format — server → client
 
-Every message is a **JSON string** (use `JSON.parse` on `event.data`). Every message has a `type`
-field. There are four types: **`SNAPSHOT`**, **`ADD`**, **`UPDATE`**, **`DROP`**.
+Every frame is a JSON string; `JSON.parse(event.data)` gives one message object. Every message has
+a `type`.
 
-Every message also carries a leading `seq` field — **you can ignore it entirely** (see §5).
+### 3.1 The envelope
 
-### 3.1 `SNAPSHOT` — the full current state
+Every message except `SNAPSHOT` has exactly these fields, in this order:
 
-Sent automatically once on connect, and again whenever you send a `SNAPSHOT_REQUEST` (§6). It is the
-complete set of currently-active `(symbol, market)` order books in one message.
+```json
+{ "type": "DEPTH", "exchange": "BINANCE", "market": "FUTURES", "symbol": "BTCUSDT", "data": { } }
+```
+
+| Field | Meaning |
+|---|---|
+| `type` | What the message is, and how to read `data`. |
+| `exchange`, `market`, `symbol` | The instrument the message is about (§3.6). |
+| `data` | The payload. Its shape depends on `type`. |
+
+### 3.2 `SNAPSHOT` — the full current state
 
 ```json
 {
-  "seq": 1,
   "type": "SNAPSHOT",
   "data": [
-    {
-      "symbol": "BTCUSDT",
-      "market": "FUTURES",
-      "bids": [ /* level objects */ ],
-      "asks": [ /* level objects */ ]
-    },
-    {
-      "symbol": "ETHUSDT",
-      "market": "SPOT",
-      "bids": [ ... ],
-      "asks": [ ... ]
-    }
+    { "type": "DEPTH", "exchange": "BINANCE", "market": "FUTURES", "symbol": "BTCUSDT",
+      "data": { "bids": [ /* levels */ ], "asks": [ /* levels */ ] } },
+    { "type": "DEPTH", "exchange": "BINANCE", "market": "SPOT", "symbol": "ETHUSDT",
+      "data": { "bids": [ /* levels */ ], "asks": [ /* levels */ ] } },
+    { "type": "TRADE", "exchange": "BINANCE", "market": "FUTURES", "symbol": "SOLUSDT",
+      "data": { "id": "BINANCE_FUTURES:SOLUSDT:3653778376", "side": "SELL", /* … §3.8 */ } }
   ]
 }
 ```
 
-**How to treat it**: replace your entire local state. Clear whatever you had and rebuild the map from
-`data`. Every entry in `data` is one order book keyed by the `(symbol, market)` pair. Anything you
-were previously tracking that is **not** in the new `data` should be dropped — a fresh snapshot is
-authoritative and complete.
+The only message without instrument fields, since it covers many instruments. Sent:
 
-### 3.2 `ADD` and `UPDATE` — an order book changed
+- once, automatically, right after connecting;
+- after the client sends `SNAPSHOT_REQUEST` (§5);
+- after the user's classification rules change.
 
-Both `ADD` and `UPDATE` carry the **same payload shape** and — importantly — **the frontend should
-treat them identically**. See §4 for the full rule.
+Each entry of `data` is **a complete envelope, byte-for-byte what you would receive live** for
+that instrument. Run each one through the same per-type handler as live messages (§4).
+
+**How to treat it** depends on the type:
+
+- **Depth**: replace your depth state. Clear all books, then handle each `DEPTH` entry. Any book
+  you had that isn't in the snapshot is gone.
+- **Trades**: **don't clear**. Trade alerts are history, not state: merge the snapshot's `TRADE`
+  entries into your list by `id` and don't notify the user about them (§3.8.5).
+
+Notes:
+
+- `data` may be an empty array (nothing notable anywhere right now, no recent trade alerts).
+- Entries come in no particular order and mix types. Sort trade alerts by `time` yourself.
+- Snapshot entries never have `"data": null`.
+
+### 3.3 `DEPTH` with `data` — an order book was added or changed
 
 ```json
 {
-  "seq": 2,
-  "type": "UPDATE",
-  "symbol": "BTCUSDT",
+  "type": "DEPTH",
+  "exchange": "BINANCE",
   "market": "FUTURES",
-  "bids": [ /* level objects */ ],
-  "asks": [ /* level objects */ ]
-}
-```
-
-`ADD` looks the same, just with `"type": "ADD"`. Each such message is the **current top levels for
-that one ticker** (up to 5 per side — see §3.5). It is a *replacement* for that ticker's book, not a
-delta to merge: overwrite your stored `bids`/`asks` for that `(symbol, market)` with the arrays in
-the message.
-
-**How to treat it**: upsert. Look up `(symbol, market)` in your local map. If present, replace its
-`bids`/`asks`. If **not** present, create it — render a new order book. (Do not discard an `UPDATE`
-just because you never saw an `ADD` for it — see §4.)
-
-### 3.3 `DROP` — a ticker was removed
-
-```json
-{
-  "seq": 3,
-  "type": "DROP",
   "symbol": "BTCUSDT",
-  "market": "FUTURES"
+  "data": {
+    "bids": [ [65432.1, 0.85, 2, 1716680000000, 0.0123] ],
+    "asks": [ ]
+  }
 }
 ```
 
-A `DROP` has **no `bids`/`asks`** — just the identifying `symbol` + `market`. It means this ticker is
-no longer part of the screener (delisted, went non-`TRADING`, lost sync, etc.).
+`data` holds the **current top levels of that one book**, up to 5 per side, each a positional
+array (§3.5). It is the full state
+of the book, not a delta: overwrite the stored `bids`/`asks` with these arrays.
 
-**How to treat it**: remove that `(symbol, market)` from your local map **immediately** and stop
-rendering it. There is no "coming back soon" implied — if it returns later, you'll get a fresh `ADD`
-/ `UPDATE` for it.
+**How to treat it**: upsert by `(exchange, market, symbol)`. If the book exists, replace its levels.
+If it doesn't, create it. There is no separate "add" message; the first `DEPTH` you receive for a
+book is how it enters.
 
-### 3.4 Level object shape (entries in `bids` / `asks`)
+### 3.4 `DEPTH` with `"data": null` — an order book left the feed
 
-Each element of a `bids` or `asks` array:
+```json
+{ "type": "DEPTH", "exchange": "BINANCE", "market": "FUTURES", "symbol": "BTCUSDT", "data": null }
+```
+
+The book no longer has a notable level. Usually its last tier-1+ level was filled, cancelled, or
+drifted out of range. It also happens when the book loses sync with the exchange or the instrument
+is delisted.
+
+**How to treat it**: remove that book from local state **immediately**. Removal is often temporary:
+if a notable level reappears, a new `DEPTH` with `data` brings the book back. A removal for a book
+you don't have is possible and is a no-op.
+
+### 3.5 Level tuple (entries in `bids` / `asks`)
+
+A level is an **array of 5 numbers in fixed positions**, not an object. Field names would repeat
+in every level and roughly double the payload, so they are left out (the same style Binance uses
+for its depth levels).
+
+```json
+[65432.1, 0.85, 2, 1716680000000, 0.0123]
+```
+
+| Index | Name | Type | Meaning |
+|---|---|---|---|
+| `0` | `price` | number | Price level. |
+| `1` | `quantity` | number | Size resting at that price, in base-asset units. |
+| `2` | `tier` | integer | Importance, **1–4 inclusive** (4 is the most important). Tier 0 is never sent. Drive visual emphasis from it. |
+| `3` | `firstSeenMillis` | integer | Unix epoch **milliseconds** when the level was first seen. Age = `Date.now() - firstSeenMillis`. |
+| `4` | `distance` | number | **Fractional** distance from mid-price: `0.0123` means **1.23%**. Rounded to 4 decimals (§3.5.1). |
+
+Read the tuple by index. Decode it into an object at the edge if the rest of the UI prefers named
+fields:
+
+```js
+const toLevel = ([price, quantity, tier, firstSeenMillis, distance]) =>
+  ({ price, quantity, tier, firstSeenMillis, distance });
+```
+
+The order is part of the contract. A new field, if ever added, is **appended** at the end;
+existing positions never move. Ignore any extra trailing elements.
+
+`bids` is the buy side, `asks` the sell side. Each array is ordered by importance: highest tier
+first, then larger notional (`price × quantity`), then closer to mid-price.
+
+Each side has **0 to 5** levels. Either side can be empty, but a non-null `data` always has at
+least one level on some side (a book with nothing notable is removed instead). Iterate whatever is
+there; don't assume 5.
+
+#### 3.5.1 Formatting `distance`
+
+`distance` arrives as a fraction rounded to **4 decimals**, i.e. a resolution of 0.01%: `0.0123`
+means 1.23%. A level very close to mid-price may arrive as `0` or `0.0`. Formatting is the
+client's job. For a percent string, multiply by 100 and round at render time:
+
+```js
+const pct = (level[4] * 100).toFixed(2); // distance; "1.23" → render "1.23%"
+```
+
+Always format with `toFixed`: `0.0007 * 100` is `0.06999999999999999` in floating point. More
+than 2 decimals of percent carries no extra information.
+
+Numbers are plain JSON numbers and may use exponent notation for very small or large values
+(`1.0E-4`). `JSON.parse` handles that.
+
+### 3.6 Instrument identity — `exchange`, `market`, `symbol`
+
+| Field | Values | Notes |
+|---|---|---|
+| `exchange` | `"BINANCE"`, `"MEXC"` | More will be added. Treat it as an open set of strings, not a fixed enum. |
+| `market` | `"SPOT"`, `"FUTURES"` | |
+| `symbol` | e.g. `"BTCUSDT"` | Normalized `BASEQUOTE`. Same spelling as the rules API; never an exchange-native form like `BTC_USDT`. |
+
+The same `symbol` + `market` on two exchanges are **independent books**. Key local state on **all
+three** fields; `symbol` + `market` alone merges two exchanges into one flickering row.
+
+```js
+const key = (m) => `${m.exchange}:${m.market}:${m.symbol}`;   // "BINANCE:FUTURES:BTCUSDT"
+```
+
+This matches the key recommended in [`ticker-list-api.md`](./ticker-list-api.md) §4, so feed rows
+line up with picker entries.
+
+Custom rules are **exchange-independent**: a rule for `BTCUSDT` / `SPOT` applies to `BTCUSDT` spot
+on every exchange. To relate a feed row to a rule, use `symbol` + `market` without `exchange`.
+
+### 3.7 Delivery guarantees
+
+- **Gap-free while connected.** The server never skips messages for an open socket: it either
+  delivers everything in order or disconnects (§6.1). Messages carry no sequence number because
+  none is needed. After any reconnect the new `SNAPSHOT` resets state.
+- **At most one `DEPTH` per book per tick.** Changes within a ~100ms window are merged; you get the
+  net result.
+- **Redundant messages are possible and harmless.** Right after a `SNAPSHOT` you may receive a
+  `DEPTH` repeating what the snapshot already showed, or a `DEPTH` with `data: null` for a book the
+  snapshot didn't contain. Upsert and remove-if-present handle both; don't treat them as errors.
+- **Trade alerts are never merged.** Each alert is sent live exactly once, in the tick after it is
+  detected; several may arrive in one tick, including several for one symbol. A reconnect replays
+  the most recent ones in the `SNAPSHOT` (§3.8.5). Merge by `id` anyway: it makes any repeat harmless.
+
+### 3.8 `TRADE` — a large trade was executed
 
 ```json
 {
-  "price": 65432.1,
-  "quantity": 0.85,
-  "tier": 2,
-  "firstSeenMillis": 1716680000000,
-  "distance": 0.0123
+  "type": "TRADE",
+  "exchange": "BINANCE",
+  "market": "FUTURES",
+  "symbol": "SOLUSDT",
+  "data": {
+    "id": "BINANCE_FUTURES:SOLUSDT:3653778376",
+    "side": "SELL",
+    "time": 1794931200123,
+    "notional": 612455.4,
+    "qty": 4380.0,
+    "avgPrice": 139.83,
+    "firstPrice": 139.91,
+    "lastPrice": 139.74,
+    "levels": 7,
+    "threshold": 500000
+  }
 }
 ```
+
+One **taker order** (a market order, or a limit order that crossed the spread) executed for at
+least the symbol's threshold. Someone actually paid this much; unlike a depth level, it cannot be
+cancelled. A trade alert is an **event, not state**: it is never updated or removed later.
+
+Trade alerts exist today for **Binance spot and futures**. Other exchanges will follow with the
+same shape. Every session receives every alert: there is no per-user filtering on the server yet,
+so filters (exchange, market, symbol, size) are applied in the UI. Custom classification rules do
+not affect trades.
+
+`data` is an object with named fields (alerts are rare, so unlike depth levels there is no tuple):
 
 | Field | Type | Meaning |
 |---|---|---|
-| `price` | number | Price level. |
-| `quantity` | number | Size resting at that price (base asset units). |
-| `tier` | integer | A whole number bound to the range **0–4 inclusive**. Use it to drive visual emphasis (color/weight). |
-| `firstSeenMillis` | integer | Unix epoch **milliseconds** — the time this order was first detected. Treat it as the order's age: `Date.now() - firstSeenMillis`. |
-| `distance` | number | **Fractional** distance from mid-price. `0.0123` means **1.23%**. See §3.6 — you must format this yourself. |
+| `id` | string | Stable identity of the alert, the same across reconnects and server restarts. Key and deduplicate by it. **Opaque**: don't parse it. |
+| `side` | `"BUY"` \| `"SELL"` | The **aggressor's** side (§3.8.1). |
+| `time` | integer | When the trade executed on the exchange, Unix epoch **ms**. Not when it was detected or sent (§3.8.4). |
+| `notional` | number | Executed value in the **quote** asset (USDT for every instrument with trade alerts today), 2 decimals. The main size figure. |
+| `qty` | number | Executed quantity in the **base** asset (`SOL` above). |
+| `avgPrice` | number | Volume-weighted average execution price, `notional / qty`. Computed, so it can carry long decimals: format it (§3.8.6). |
+| `firstPrice` | number | Price of the first level the order took. |
+| `lastPrice` | number | Price of the last level the order took. Equal to `firstPrice` when `levels` is 1. |
+| `levels` | integer ≥ 1 | How many price levels the order took (§3.8.2). |
+| `threshold` | number | The minimum notional this symbol needed to alert, in the same quote asset. `notional ≥ threshold` always (§3.8.3). |
 
-`bids` are the buy side, `asks` the sell side. Arrays are already ordered best-first by the server
-and contain **at most 5 levels** each.
+New fields may be added to `data` later; ignore fields you don't know.
 
-### 3.5 Array sizes
+#### 3.8.1 Side
 
-Each side (`bids`, `asks`) contains **up to 5** levels. It can be fewer than 5 (or empty). Just
-iterate whatever is there; don't assume exactly 5.
+Every trade has a buyer and a seller. `side` is the side of the one who **crossed the spread** (the
+taker):
 
-### 3.6 `distance` — round it yourself
+- `BUY`: the taker bought, consuming asks (offers). Price is pushed up.
+- `SELL`: the taker sold, consuming bids. Price is pushed down.
 
-The `distance` field is a **raw fraction with full floating-point precision** — e.g. you will
-literally receive values like `0.012338271604938272`, not a clean `0.0123`. The backend sends it
-verbatim as a fraction and leaves formatting to the client.
+Label it as "bought" / "sold" (or "taker buy" / "taker sell"), not as bullish/bearish.
 
-To display it as a percentage:
+#### 3.8.2 Sweeps: `levels`, `firstPrice`, `lastPrice`
+
+An order bigger than the best level eats it and continues to the next price, then the next: a
+**sweep**. The exchange reports each price level as a separate trade; the server joins them back
+into one alert.
+
+- `levels` is the number of price levels taken. Each is a different price, moving in the taker's
+  direction: for `BUY` `lastPrice > firstPrice`, for `SELL` `lastPrice < firstPrice`.
+- `levels: 1` is one large fill at one price: the order hit one level big enough to absorb it (a
+  wall, or hidden size). `firstPrice == lastPrice == avgPrice`.
+- `levels > 1` means the order swept the book. Show it (e.g. "swept 7 levels").
+- **Price impact** of the sweep, as a fraction (`0.0012` = 0.12%):
+
+  ```js
+  const impact = Math.abs(data.lastPrice / data.firstPrice - 1);
+  const pct = (impact * 100).toFixed(2);   // "0.12" → "0.12%"
+  ```
+
+  It is how far the one order moved the price. A large `levels` with a small impact means a dense
+  book; few levels with a large impact means a thin one.
+
+Limits of what the exchange reports: on futures, Binance merges same-price fills over about 100ms,
+so rarely an alert is two or more orders the exchange itself merged. On spot, two orders at the same
+price in the same millisecond (one algorithm's child orders) arrive as two alerts. Neither can be
+told apart from the data.
+
+#### 3.8.3 Size: `notional`, `threshold`
+
+Thresholds differ per symbol, from $30K on most coins to $5M on BTC futures, so that each symbol
+alerts at a readable rate. Raw `notional` therefore doesn't compare across symbols: $600K is routine
+on BTC and huge on a small coin. Use the **relative size** for emphasis, the way `tier` drives
+emphasis for depth:
 
 ```js
-const pct = (level.distance * 100).toFixed(2); // "1.23"  →  render as "1.23%"
+const relative = data.notional / data.threshold;   // always ≥ 1
 ```
 
-So: **multiply by 100, then round to 2 decimals** for a percent string. Do this at render time; keep
-the raw value if you need it for anything numeric.
+Suggested buckets (tune freely): `1–2×`, `2–5×`, `5–10×`, `≥ 10×`. Show `notional` itself as the
+headline number.
+
+`threshold` is the value the alert was judged against when it fired. Thresholds are server
+configuration and may change between releases; with per-user thresholds (planned) it will become the
+user's own value. Always read it from the alert, never hardcode it.
+
+#### 3.8.4 Time, delay and order
+
+- `time` is the exchange's execution time. Show age from it (`Date.now() - time`).
+- **Delay**: an alert usually arrives a few hundred ms after `time`. A sweep is only known to be
+  over when that symbol trades again, and Binance futures sends the last part of a sweep up to
+  ~150ms late. On a rarely traded symbol the delay can be several seconds.
+- **Arrival order is detection order, not execution order.** A futures alert can arrive after a spot
+  alert that executed later. Keep your list sorted by `time` (then `id` to break ties), don't just
+  prepend.
+
+#### 3.8.5 Snapshot replay and deduplication
+
+Every `SNAPSHOT` carries the **most recent 100 trade alerts** across all exchanges and symbols (fewer
+right after a server restart: alerts are kept in memory only).
+
+- **Merge, don't clear.** Add each `TRADE` entry whose `id` you don't have; skip the ones you have.
+  Keep alerts you already had that aren't in the snapshot. The ids are stable, so a snapshot after a
+  reconnect or a server restart never duplicates anything.
+- **Don't notify for snapshot entries.** They are history: put them in the list silently. Only live
+  `TRADE` messages may trigger a toast or sound. Otherwise every reconnect, rule edit or
+  `SNAPSHOT_REQUEST` would replay up to 100 notifications.
+- Alerts that fired while you were disconnected are recovered only if they are still among the
+  latest 100. In a quiet market that covers roughly the last 20–40 minutes, in a volatile one a few
+  minutes.
+- Cap your own list (e.g. a few hundred alerts, or by age). The server never tells you to remove an
+  alert.
+
+#### 3.8.6 Presentation notes (suggestions, not contract)
+
+- **Rate**: measured over one afternoon, roughly 150–250 alerts/hour in total in quiet hours and
+  ~1,000/hour in a sell-off, arriving in bursts during sharp moves. About 80% are futures.
+  A list or tape absorbs that; toasts need a user-set minimum (relative size or notional), a mute
+  switch and client-side rate limiting.
+- **Prices**: `firstPrice` and `lastPrice` are exchange prices and print cleanly. Format `avgPrice`
+  with the number of decimals of `firstPrice` / `lastPrice` (or `toPrecision`), never raw.
+- **Numbers** may use exponent notation (`2.5E7` for $25M); `JSON.parse` handles it. Format
+  `notional` compactly at render time ($612.5K, $25M).
+- A useful row: side colour · `exchange` `market` `symbol` · notional · relative size · age, with
+  "swept N levels, firstPrice → lastPrice (impact %)" when `levels > 1`.
 
 ---
 
-## 4. The core rendering rule: ADD ≡ UPDATE, and UPDATE-without-ADD is normal
+## 4. Handling messages
 
-This is the single most important behavioral note for the feed. Internally the backend distinguishes
-`ADD` (first time a ticker enters the feed) from `UPDATE` (subsequent changes), but **for the
-frontend there is no meaningful difference** — and you must not assume `ADD` always precedes
-`UPDATE` for a given ticker.
+### 4.1 Reference handler
 
-**Because of feed coalescing and per-user timing, it is completely normal and expected to receive an
-`UPDATE` for a ticker you have never seen an `ADD` for.** This is not an error, not a dropped
-message, and not something to guard against.
-
-**The rule — treat both `ADD` and `UPDATE` as the same "upsert" operation:**
+Write one handler per `type` and use it for live messages and snapshot entries alike. The handler
+is told whether the message came from a snapshot, so trade alerts can skip notifications:
 
 ```js
-function onOrderBookMessage(msg) {
+const key = (m) => `${m.exchange}:${m.market}:${m.symbol}`;
+
+function onEnvelope(msg, fromSnapshot) {
   switch (msg.type) {
-    case "SNAPSHOT":
-      state.clear();
-      for (const book of msg.data) {
-        state.set(key(book.symbol, book.market), book);
+    case "DEPTH":
+      if (msg.data === null) {
+        books.delete(key(msg));                 // left the feed (no-op if absent)
+      } else {
+        books.set(key(msg), {                   // upsert: create or replace levels
+          exchange: msg.exchange, market: msg.market, symbol: msg.symbol,
+          bids: msg.data.bids, asks: msg.data.asks,
+        });
       }
       break;
-
-    case "ADD":
-    case "UPDATE": {                       // ← identical handling, intentionally
-      const k = key(msg.symbol, msg.market);
-      // If it's missing, create it; if present, replace its levels.
-      state.set(k, { symbol: msg.symbol, market: msg.market, bids: msg.bids, asks: msg.asks });
+    case "TRADE":
+      if (trades.has(msg.data.id)) break;       // already have it (snapshot replay)
+      trades.set(msg.data.id, {
+        exchange: msg.exchange, market: msg.market, symbol: msg.symbol, ...msg.data,
+      });                                       // keep sorted by time; cap the size (§3.8.5)
+      if (!fromSnapshot) notifyTrade(msg);      // toasts/sounds for live alerts only
       break;
-    }
-
-    case "DROP":
-      state.delete(key(msg.symbol, msg.market));   // remove immediately
-      break;
+    default:
+      break;                                    // unknown type: ignore (§4.2)
   }
 }
 
-const key = (symbol, market) => `${symbol}:${market}`;
+function onMessage(msg) {
+  if (msg.type === "SNAPSHOT") {
+    books.clear();                              // depth is state: replace it
+                                                // trades are history: NOT cleared, merged by id
+    for (const entry of msg.data) onEnvelope(entry, true);
+  } else {
+    onEnvelope(msg, false);
+  }
+}
+
+ws.onmessage = (e) => onMessage(JSON.parse(e.data));
 ```
 
-In short:
-- **`ADD` / `UPDATE`** → if the `(symbol, market)` book is missing, render it; if it exists, replace
-  its levels. Never drop an `UPDATE` for lack of a prior `ADD`.
-- **`DROP`** → remove the book immediately.
-- **`SNAPSHOT`** → wipe and rebuild everything.
+### 4.2 Unknown types
 
-`market` is always one of exactly two string values: **`"SPOT"`** or **`"FUTURES"`**. Always key your
-local state on the `(symbol, market)` pair — the same symbol can exist in both markets simultaneously
-as two independent books.
+New `type`s will be added without a coordinated frontend release. **Ignore any `type` you don't
+recognise**, live or inside `SNAPSHOT.data`. Don't throw, log noisily, or close the socket.
 
 ---
 
-## 5. About the `seq` field — ignore it
+## 5. Client → server
 
-Every message includes a leading integer `seq` (e.g. `{"seq": 42, "type": "UPDATE", ...}`).
-**Completely ignore this parameter.** Do not track it or branch on it. It is documented here only so
-you're not confused seeing it in the payload.
+There is exactly **one** supported message, sent as a raw string (not JSON):
 
----
-
-## 6. Client → server messages
-
-The client rarely needs to send anything. There is exactly **one** supported message today:
-
-| Send (raw text, not JSON) | Effect |
+| Send | Effect |
 |---|---|
-| `SNAPSHOT_REQUEST` | Server delivers a fresh full `SNAPSHOT` on its next drain tick (~100ms). |
+| `SNAPSHOT_REQUEST` | The server sends a fresh `SNAPSHOT` on its next tick (~100ms). |
 
 ```js
-ws.send("SNAPSHOT_REQUEST"); // literally this string, no JSON envelope
+ws.send("SNAPSHOT_REQUEST");
 ```
 
-Send this if you ever suspect your local state has drifted, or after a UI event where you want to
-hard-resync (e.g. the user re-opens the order-book panel). Any unrecognized message is silently
-ignored by the server. Note it is sent as a **plain string**, not JSON.
+Use it when local state may have drifted or the UI wants a hard resync (e.g. the order-book panel
+is re-opened). Any other message is silently ignored. You don't need it after editing rules; that
+snapshot is pushed automatically.
 
 ---
 
-## 7. Connection lifecycle & reconnection
+## 6. Connection lifecycle
 
-### 7.1 Slow-client eviction
+### 6.1 Slow-client eviction
 
-The server protects itself from clients that can't keep up. Each session has a bounded send queue
-(32 batches ≈ 3.2s of backlog). If your connection stalls and the queue fills, the server
-**disconnects you** rather than buffering unbounded. You'll observe this as the socket closing
-(typically close code **1001 / GOING_AWAY**).
+Each session has a bounded send queue: 32 ticks, about 3.2s of backlog. If the client stops reading
+(stalled tab, dead network) and the queue fills, the server **disconnects** instead of buffering
+without limit or dropping messages. The socket closes, typically with **1001 (GOING_AWAY)**.
+Reconnect as for any disconnect; the new snapshot restores state.
 
-This is not an error you can "fix" per message — it means the client couldn't drain fast enough
-(stalled tab, dead network). The correct response is the same as any disconnect: **reconnect**, and
-you'll get a fresh snapshot.
+### 6.2 Reconnection strategy
 
-### 7.2 Reconnection strategy (recommended)
-
-1. On `close` (any code) or `error`, attempt to reconnect with **exponential backoff** (e.g. start
-   ~1s, cap ~30s) plus a little jitter. Don't hammer a tight retry loop.
-2. **Before reconnecting, ensure the access token is still valid**; refresh it if needed (see
-   `auth-api.md` §4.4). Reconnecting with an expired token gets you an immediate 1008 close.
-3. On close code **1008**, treat it as an auth problem specifically: refresh the token first, then
-   reconnect. If refresh itself fails, route the user to login — don't keep retrying the socket.
-4. On reconnect you'll automatically receive a new `SNAPSHOT` — **clear local state and rebuild** from
-   it. Do not try to resume from where you left off.
+1. On `close` (any code) or `error`, reconnect with **exponential backoff** plus jitter (e.g. start
+   ~1s, cap ~30s). Never retry in a tight loop.
+2. Before reconnecting, make sure the access token is valid; refresh it if needed.
+3. On **1008**, check `event.reason`:
+   - `"Subscription required"` → **stop** and show the paywall.
+   - otherwise → refresh the token, then reconnect. If the refresh fails, send the user to login.
+4. After reconnecting, a `SNAPSHOT` arrives automatically. Rebuild from it; don't try to resume.
 
 ```js
 let backoff = 1000;
+
 function connect() {
   const ws = new WebSocket(`wss://tc-screener.com/ws?token=${encodeURIComponent(getAccessToken())}`);
 
-  ws.onmessage = (e) => onOrderBookMessage(JSON.parse(e.data));
-
-  ws.onopen = () => { backoff = 1000; };          // reset backoff on success
-
+  ws.onopen = () => { backoff = 1000; };
+  ws.onmessage = (e) => onMessage(JSON.parse(e.data));
   ws.onclose = (e) => {
-    if (e.code === 1008) {                         // auth failure
-      refreshTokenThen(connect);                   // refresh, then reconnect
+    if (e.code === 1008) {
+      if (e.reason === "Subscription required") { showPaywall(); return; }
+      refreshTokenThen(connect);
       return;
     }
     setTimeout(connect, backoff + Math.random() * 500);
@@ -322,36 +521,107 @@ function connect() {
 }
 ```
 
-### 7.3 Close code cheat sheet
+### 6.3 Close codes
 
-| Close code | Meaning | Client action |
-|---|---|---|
-| 1008 (VIOLATED_POLICY) | Missing / invalid / expired token at handshake | Refresh token, then reconnect. If refresh fails → login. |
-| 1001 (GOING_AWAY) | Slow-client eviction, or server shutdown | Reconnect with backoff. |
-| 1006 / other abnormal | Network drop | Reconnect with backoff. |
+| Code | Reason | Meaning | Client action |
+|---|---|---|---|
+| 1008 | `Missing token` / `Invalid or expired token` | Auth failed at connect | Refresh token, reconnect. Refresh fails → login. |
+| 1008 | `Subscription required` | No active trial/subscription | Show paywall. Don't reconnect until the user pays. |
+| 1001 | — | Slow-client eviction, or server shutdown/deploy | Reconnect with backoff. |
+| 1006 / other | — | Network drop | Reconnect with backoff. |
 
 ---
 
-## 8. Quick reference
+## 7. Quick reference
 
-**Connect**: `wss://<host>/ws?token=<accessToken>` — token is the **access JWT**, as a query param.
+**Connect**: `wss://<host>/ws?token=<accessJwt>`. Needs an active trial/subscription (admins pass).
 
-**Server → client message types**:
+**Envelope** (every message except `SNAPSHOT`): `{"type", "exchange", "market", "symbol", "data"}`.
 
-| Type | Has `bids`/`asks`? | Client action |
+| `type` | `data` | Client action |
 |---|---|---|
-| `SNAPSHOT` | Yes (array under `data[]`) | Clear all local state, rebuild from `data`. |
-| `ADD` | Yes | Upsert `(symbol, market)` — create if missing, replace levels if present. |
-| `UPDATE` | Yes | **Identical to `ADD`.** Upsert. Normal to arrive with no prior `ADD`. |
-| `DROP` | No | Remove `(symbol, market)` immediately. |
+| `SNAPSHOT` | Array of envelopes, exactly as sent live | Clear depth state, then handle each entry. Trade alerts are merged by `id`, not cleared, and not notified. |
+| `DEPTH` | `{ bids, asks }` | Upsert the `(exchange, market, symbol)` book. |
+| `DEPTH` | `null` | Remove that book (no-op if absent). |
+| `TRADE` | `{ id, side, time, notional, qty, avgPrice, firstPrice, lastPrice, levels, threshold }` | Add to the alert list if the `id` is new; notify only when live. |
+| anything else | — | Ignore. |
 
-**Level fields**: `price`, `quantity`, `tier` (whole number 0–4), `firstSeenMillis` (epoch ms),
-`distance` (**fraction** — do `×100`, `.toFixed(2)` for a `%`).
+**Identity**: `exchange` (open set), `market` (`SPOT` / `FUTURES`), `symbol` (normalized
+`BASEQUOTE`). Key state on all three.
 
-**`market`**: always `"SPOT"` or `"FUTURES"`. Key local state on `(symbol, market)`.
+**Levels**: positional arrays `[price, quantity, tier, firstSeenMillis, distance]`: `tier` 1–4,
+`firstSeenMillis` epoch ms, `distance` a fraction rounded to 4 decimals (×100 then `.toFixed(2)`
+for `%`). 0–5 per side, ordered by importance.
 
-**`seq`**: ignore it.
+**Trades**: one large taker order. `side` is the aggressor's; `levels > 1` is a sweep from
+`firstPrice` to `lastPrice`; relative size is `notional / threshold`; sort by `time`, dedupe by `id`.
 
-**Client → server**: only `SNAPSHOT_REQUEST` (raw string) to force a resync.
+**Client → server**: `SNAPSHOT_REQUEST` (raw string) forces a resync.
 
-**On disconnect**: reconnect with backoff (fresh token if 1008) → rebuild from the pushed `SNAPSHOT`.
+**On disconnect**: reconnect with backoff and rebuild from the pushed `SNAPSHOT`. On 1008 refresh
+the token, unless the reason is `Subscription required` (show the paywall).
+
+### TypeScript shapes
+
+```ts
+type Market = 'SPOT' | 'FUTURES';
+
+/** Wire tuple: [price, quantity, tier, firstSeenMillis (epoch ms), distance (fraction, 4 dp)] */
+type LevelTuple = [
+  price: number,
+  quantity: number,
+  tier: 1 | 2 | 3 | 4,
+  firstSeenMillis: number,
+  distance: number,
+];
+
+interface InstrumentIdentity {
+  exchange: string;          // open set, e.g. "BINANCE", "MEXC"
+  market: Market;
+  symbol: string;            // normalized BASEQUOTE
+}
+
+interface DepthData {
+  bids: LevelTuple[];        // 0–5, most important first
+  asks: LevelTuple[];
+}
+
+interface DepthMessage extends InstrumentIdentity {
+  type: 'DEPTH';
+  data: DepthData | null;    // null = remove the book
+}
+
+interface TradeData {
+  id: string;                // opaque, stable; dedupe key
+  side: 'BUY' | 'SELL';      // aggressor's side
+  time: number;              // exchange execution time, epoch ms
+  notional: number;          // quote asset (USDT), 2 dp
+  qty: number;               // base asset
+  avgPrice: number;          // notional / qty; format before display
+  firstPrice: number;
+  lastPrice: number;         // === firstPrice when levels === 1
+  levels: number;            // ≥ 1; > 1 = sweep
+  threshold: number;         // notional >= threshold
+}
+
+interface TradeMessage extends InstrumentIdentity {
+  type: 'TRADE';
+  data: TradeData;           // never null
+}
+
+/** Any message except SNAPSHOT. Types not handled here must be ignored. */
+interface UnknownEnvelope extends InstrumentIdentity {
+  type: string;
+  data: unknown;
+}
+
+type Envelope = DepthMessage | TradeMessage | UnknownEnvelope;
+
+interface SnapshotMessage {
+  type: 'SNAPSHOT';
+  data: Envelope[];          // same shapes as live messages; never DEPTH with data: null;
+                             // up to 100 TRADE entries (history: merge, don't notify)
+}
+
+type FeedMessage = SnapshotMessage | Envelope;
+```
