@@ -118,7 +118,8 @@ export const useOrderbookStore = create<OrderbookState>((set) => ({
         } else if (msg.type === 'DEPTH') {
           applyDepth(msg, true);
         }
-        // TRADE messages (and a snapshot's `trades`) belong to `tradeStore`, not this store.
+        // TRADE messages (and a snapshot's `trades`) belong to `tradeStore`, CLUSTER messages
+        // (and a snapshot's `clusters`) to `clusterStore`, not this store.
       }
 
       // If nothing mutated, return the same `books` ref so selector subscribers bail.

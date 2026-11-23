@@ -143,6 +143,67 @@ export interface TradeAlert extends TradeData {
   seq: number;
 }
 
+/** One level of a cluster's ladder, decoded from the wire's positional `[price, quantity]`. */
+export interface ClusterLevel {
+  price: number;
+  quantity: number; // base-asset units
+}
+
+/** One layered order: a run of consecutive, similar-sized levels on one side (doc §3.9). */
+export interface Cluster {
+  priceFrom: number; // lowest price, on both sides
+  priceTo: number; // highest price, on both sides
+  levelCount: number;
+  totalNotional: number; // quote asset (USDT)
+  totalQuantity: number; // base asset
+  distance: number; // FRACTION, nearest edge from mid — as of the last update, not live (§3.9.2)
+  firstSeenMillis: number; // epoch ms; unchanged by updates
+  levels: ClusterLevel[]; // ascending price on both sides
+}
+
+/** An instrument's complete current clusters, nearest the mid first on each side (doc §3.9). */
+export interface ClusterData {
+  bidClusters: Cluster[];
+  askClusters: Cluster[];
+}
+
+/**
+ * A decoded `CLUSTER` envelope (doc §3.9). State, like `DEPTH`: `data` REPLACES everything held
+ * for the instrument, and `data: null` means it has no clusters any more.
+ */
+export interface ClusterMessage {
+  type: 'CLUSTER';
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  data: ClusterData | null;
+}
+
+/** One instrument's stored clusters. At least one side is non-empty (an empty one is deleted). */
+export interface InstrumentClusters extends ClusterData {
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+}
+
+/** One cluster with its instrument and side: an entry of the active-cluster list. */
+export interface ActiveCluster {
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  side: 'bid' | 'ask';
+  cluster: Cluster;
+}
+
+export type ClusterKey = string; // `${exchange}:${symbol}:${market}`
+
+/**
+ * The canonical key for one instrument's clusters. Unlike `bookKey` it includes the exchange:
+ * a `CLUSTER` replaces one `(exchange, market, symbol)` instrument, not a pair.
+ */
+export const clusterKey = (exchange: Exchange, symbol: string, market: Market): ClusterKey =>
+  `${exchange}:${symbol}:${market}`;
+
 /**
  * The decoded messages the stores consume. The feed client's guard has already dropped
  * unknown types, exchanges with an invalid id (or beyond the registry cap) and malformed
@@ -151,9 +212,10 @@ export interface TradeAlert extends TradeData {
  *
  * A `SNAPSHOT`'s mixed entries are split by type at decode time: `data` is the depth state
  * (replaces the order book), `trades` the replayed recent alerts (merged by id, never counted
- * as unread).
+ * as unread), `clusters` the cluster state (replaces every instrument's clusters, never alerts).
  */
 export type FeedMessage =
-  | { type: 'SNAPSHOT'; data: DepthMessage[]; trades: TradeMessage[] }
+  | { type: 'SNAPSHOT'; data: DepthMessage[]; trades: TradeMessage[]; clusters: ClusterMessage[] }
   | DepthMessage
-  | TradeMessage;
+  | TradeMessage
+  | ClusterMessage;

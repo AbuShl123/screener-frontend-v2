@@ -190,6 +190,11 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
   next snapshot doesn't bring them back. **Only the Settings trade venue mutes apply to trades**
   (`mutedTradeVenues`: dropped before `ingest`, hidden at display time) — muted tickers, the
   minimum tier and the header exchange filter do not. No toasts/sounds yet.
+- **Order clusters** (`CLUSTER`, doc §3.9) are **state, like depth, not history like trades**: each
+  message replaces that `(exchange, market, symbol)` instrument's whole set in `useClusterStore`
+  (`src/stores/clusterStore.ts`), `data: null` removes it, and a `SNAPSHOT` replaces the whole
+  map. Snapshot entries must never raise an alert. Backend delivery is off, so the dev server exposes
+  `window.__clusterMock` (`src/dev/clusterMock.ts`), which injects raw frames into the real flush.
 - The order book grid itself is expected to eventually bypass React's reconciliation for its
   hottest updates (virtualized DOM first, canvas if profiling demands it) — not yet needed at
   current scale.

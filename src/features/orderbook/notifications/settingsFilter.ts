@@ -50,8 +50,8 @@ export function filterBySettings(
 /**
  * The batch handed to `useTradeStore.ingest()`, minus trade alerts from trade-muted venues
  * (live `TRADE`s and a `SNAPSHOT`'s replayed `trades`). Returns `batch` itself when nothing is
- * muted (the common case) and copies a snapshot only when it actually loses a trade. Depth
- * entries pass through untouched — the trade store ignores them anyway.
+ * muted (the common case) and copies a snapshot only when it actually loses a trade. Depth and
+ * cluster entries pass through untouched — the trade store ignores them anyway.
  */
 export function dropMutedTrades(
   batch: readonly FeedMessage[],
