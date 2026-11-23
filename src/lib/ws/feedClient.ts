@@ -1,9 +1,14 @@
 import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
-import { filterAnnounced, resetCooldown } from '@/features/orderbook/notifications/cooldown';
+import {
+  filterAnnounced,
+  filterAnnouncedClusters,
+  resetCooldown,
+} from '@/features/orderbook/notifications/cooldown';
 import {
   dropMutedTrades,
   filterBySettings,
+  isClusterMuted,
 } from '@/features/orderbook/notifications/settingsFilter';
 import {
   isValidExchangeId,
@@ -513,8 +518,14 @@ function flush(): void {
   // Trade alerts first: they are independent of the order book. Only the trade venue mutes
   // apply to them (the minimum tier, muted tickers and depth venue mutes never do).
   useTradeStore.getState().ingest(dropMutedTrades(batch, mutedTradeVenues));
-  // Clusters are stored unfiltered, like books.
-  useClusterStore.getState().applyMessages(batch);
+  // Clusters are stored unfiltered, like books; only their alerts are filtered, mutes before
+  // cooldown for the same reason as depth below.
+  const appeared = useClusterStore.getState().applyMessages(batch);
+  useClusterStore
+    .getState()
+    .announce(
+      filterAnnouncedClusters(appeared.filter((c) => !isClusterMuted(c, muted, mutedVenues))),
+    );
   const candidates = useOrderbookStore.getState().applyMessages(batch);
   // Push-boundary filter: drop muted-ticker / depth-muted-venue / below-minTier candidates
   // BEFORE cooldown, so they never write a cooldown entry (un-muting later lets that order

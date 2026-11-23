@@ -1,7 +1,8 @@
 /**
- * The two alert-stream glyphs from the design template, shared by the collapsed handles and
+ * The alert-stream glyphs from the design template, shared by the collapsed handles and
  * the panel tabs: a mini depth ladder (asks / dashed spread / bids) for order book alerts, a
- * lightning bolt (an executed hit) for large trades. Decorative — callers label the control.
+ * lightning bolt (an executed hit) for large trades, a solid stack of equal levels for order
+ * clusters. Decorative — callers label the control.
  */
 
 export function DepthIcon({ size }: { size: number }) {
@@ -41,6 +42,27 @@ export function TradeIcon({ size, strokeWidth = 2 }: { size: number; strokeWidth
       className="flex-none"
     >
       <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+    </svg>
+  );
+}
+
+export function ClusterIcon({ size, strokeWidth = 2 }: { size: number; strokeWidth?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="flex-none"
+    >
+      <rect x="4" y="3" width="16" height="4" rx="1" />
+      <rect x="4" y="10" width="16" height="4" rx="1" />
+      <rect x="4" y="17" width="16" height="4" rx="1" />
     </svg>
   );
 }

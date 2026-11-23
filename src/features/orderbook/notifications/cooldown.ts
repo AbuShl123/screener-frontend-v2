@@ -1,4 +1,5 @@
-import type { Notification } from '@/features/orderbook/types';
+import { isSameRange, type PriceRange } from '@/features/orderbook/clusterIdentity';
+import { clusterKey, type ActiveCluster, type Notification } from '@/features/orderbook/types';
 
 /**
  * De-duplication cooldown for notifications.
@@ -65,8 +66,43 @@ export function filterAnnounced(candidates: Notification[]): Notification[] {
   return fresh;
 }
 
+interface AnnouncedRange extends PriceRange {
+  at: number;
+}
+
+/** `exchange:symbol:market:side` → price ranges announced within the window. */
+const announcedClusters = new Map<string, readonly AnnouncedRange[]>();
+
+/**
+ * The cluster counterpart of `filterAnnounced`. The exact bounds can't be the dedup key: a wall
+ * that flickers away and returns (or comes back after a server restart) rarely has identical
+ * bounds, so an announced range silences any later cluster overlapping it on that side.
+ */
+export function filterAnnouncedClusters(
+  candidates: readonly ActiveCluster[],
+): readonly ActiveCluster[] {
+  if (candidates.length === 0) return candidates;
+
+  const now = Date.now();
+  for (const [key, ranges] of announcedClusters) {
+    const live = ranges.filter((r) => now - r.at < COOLDOWN_MS);
+    if (live.length === 0) announcedClusters.delete(key);
+    else announcedClusters.set(key, live);
+  }
+
+  return candidates.filter(({ exchange, symbol, market, side, cluster }) => {
+    const key = `${clusterKey(exchange, symbol, market)}:${side}`;
+    const ranges = announcedClusters.get(key) ?? [];
+    if (ranges.some((r) => isSameRange(r, cluster))) return false;
+    const { priceFrom, priceTo } = cluster;
+    announcedClusters.set(key, [...ranges, { priceFrom, priceTo, at: now }]);
+    return true;
+  });
+}
+
 /** Forget all cooldown history — called on feed stop / session end so a new session starts clean. */
 export function resetCooldown(): void {
   lastAnnounced.clear();
+  announcedClusters.clear();
   lastPrune = 0;
 }

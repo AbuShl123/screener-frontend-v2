@@ -71,6 +71,13 @@
       "exceptional": "Exceptional"
     }
   },
+  "cluster": {
+    "age": "Active for {{age}}",
+    "metric": {
+      "range": "PRICE RANGE",
+      "levels": "LEVELS"
+    }
+  },
   "panel": {
     "title": "Notifications",
     "clearAll": "Clear all notifications",
@@ -82,13 +89,18 @@
     "tabs": {
       "label": "Alert type",
       "depth": "Order book",
-      "trades": "Large trades",
+      "trades": "Trades",
       "depthTitle": "Order book alerts",
-      "tradesTitle": "Large trade alerts"
+      "tradesTitle": "Large trade alerts",
+      "clusters": "Clusters",
+      "clustersTitle": "Active order clusters"
     },
     "searchPlaceholder": "Search ticker, price, size…",
     "empty": "No matching notifications",
-    "emptyTrades": "No matching trade alerts"
+    "emptyTrades": "No matching trade alerts",
+    "openClusters": "Open order clusters",
+    "emptyClusters": "No active clusters",
+    "emptyClustersSearch": "No matching clusters"
   },
   "dashboard": {
     "reconnecting": "Reconnecting to the feed…",

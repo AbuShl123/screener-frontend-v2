@@ -179,8 +179,15 @@ export interface ClusterMessage {
   data: ClusterData | null;
 }
 
+/** A stored cluster: `id` is client-side and follows the cluster across updates (§3.9.1). */
+export interface TrackedCluster extends Cluster {
+  id: string;
+}
+
 /** One instrument's stored clusters. At least one side is non-empty (an empty one is deleted). */
-export interface InstrumentClusters extends ClusterData {
+export interface InstrumentClusters {
+  bidClusters: TrackedCluster[];
+  askClusters: TrackedCluster[];
   exchange: Exchange;
   market: Market;
   symbol: string;
@@ -192,7 +199,7 @@ export interface ActiveCluster {
   market: Market;
   symbol: string;
   side: 'bid' | 'ask';
-  cluster: Cluster;
+  cluster: TrackedCluster;
 }
 
 export type ClusterKey = string; // `${exchange}:${symbol}:${market}`

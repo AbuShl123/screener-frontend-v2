@@ -193,7 +193,11 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
 - **Order clusters** (`CLUSTER`, doc §3.9) are **state, like depth, not history like trades**: each
   message replaces that `(exchange, market, symbol)` instrument's whole set in `useClusterStore`
   (`src/stores/clusterStore.ts`), `data: null` removes it, and a `SNAPSHOT` replaces the whole
-  map. Snapshot entries must never raise an alert. Backend delivery is off, so the dev server exposes
+  map. Snapshot entries must never raise an alert: `applyMessages` returns only clusters that
+  appeared live, and `feedClient` filters them by muted tickers + depth venue mutes (not the minimum
+  tier), then the cooldown. Identity is client-side (`clusterIdentity.ts`: same `firstSeenMillis`
+  or enough price overlap). An alert is an unread count; the panel's clusters tab lists what is
+  active now. Backend delivery is off, so the dev server exposes
   `window.__clusterMock` (`src/dev/clusterMock.ts`), which injects raw frames into the real flush.
 - The order book grid itself is expected to eventually bypass React's reconciliation for its
   hottest updates (virtualized DOM first, canvas if profiling demands it) — not yet needed at
@@ -342,9 +346,9 @@ components or pages.
   trades-tab counterpart.
 - **`notifications/useUnreadCounts.ts`** — `useDepthUnread()` / `useTradeUnread()`, the visible
   unread counts shared by the handle badges and the tab chips.
-- **Notification panel tabs:** `NotificationPanel` has two tabs, order book (depth) and large
-  trades; `DashboardPage` owns the active tab next to `notifOpen`, because each of the two
-  collapsed handles (`NotificationHandle`: depth ladder + lightning) opens the panel on its own
+- **Notification panel tabs:** `NotificationPanel` has three tabs, order book (depth), large
+  trades and active clusters (`ClusterList` → `ClusterCard`); `DashboardPage` owns the active tab next to `notifOpen`, because each of the three
+  collapsed handles (`NotificationHandle`: depth ladder, lightning, stack) opens the panel on its own
   tab. While the panel is open on a tab, that stream's store is told it's being viewed
   (`setViewing`) and counts nothing as unread, so only an inactive tab shows a chip (hidden at
   0); the shared search and "Clear all" act on the active tab. `TradeCard` (memoized — alerts never change) renders a
