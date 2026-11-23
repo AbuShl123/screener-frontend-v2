@@ -1,7 +1,8 @@
-import { memo, useEffect, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotificationCard } from '@/features/orderbook/components/NotificationCard';
 import { TradeCard } from '@/features/orderbook/components/TradeCard';
+import { ClusterLadder } from '@/features/orderbook/components/ClusterLadder';
 import { ClusterList } from '@/features/orderbook/components/ClusterList';
 import { ClusterIcon, DepthIcon, TradeIcon } from '@/features/orderbook/components/alertIcons';
 import { matches } from '@/features/orderbook/notifications/notificationSearch';
@@ -13,6 +14,7 @@ import {
 } from '@/features/orderbook/notifications/useUnreadCounts';
 import { isVenueMuted } from '@/features/orderbook/notifications/settingsFilter';
 import { useExchangeRegistry } from '@/features/orderbook/exchanges';
+import type { ActiveCluster } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '@/features/settings';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 import { useClusterStore } from '@/stores/clusterStore';
@@ -62,6 +64,9 @@ export const NotificationPanel = memo(function NotificationPanel({
 }: NotificationPanelProps) {
   const { t } = useTranslation('orderbook');
   const [query, setQuery] = useState('');
+  // The cluster whose ladder replaces the clusters list, as it was when opened.
+  const [openCluster, setOpenCluster] = useState<ActiveCluster | null>(null);
+  const closeLadder = useCallback(() => setOpenCluster(null), []);
   const notifications = useNotificationStore((s) => s.notifications);
   const setDepthViewing = useNotificationStore((s) => s.setViewing);
   const clearDepth = useNotificationStore((s) => s.clear);
@@ -84,8 +89,9 @@ export const NotificationPanel = memo(function NotificationPanel({
   useEffect(() => {
     setDepthViewing(open && tab === 'depth');
     setTradesViewing(open && tab === 'trades');
-    setClustersViewing(open && tab === 'clusters');
-  }, [open, tab, setDepthViewing, setTradesViewing, setClustersViewing]);
+    // An open ladder hides the list, so clusters appearing meanwhile do count as unread.
+    setClustersViewing(open && tab === 'clusters' && openCluster === null);
+  }, [open, tab, openCluster, setDepthViewing, setTradesViewing, setClustersViewing]);
   useEffect(
     () => () => {
       setDepthViewing(false);
@@ -98,6 +104,7 @@ export const NotificationPanel = memo(function NotificationPanel({
   const isDepth = tab === 'depth';
   const isTrades = tab === 'trades';
   const isClusters = tab === 'clusters';
+  const ladder = isClusters ? openCluster : null;
 
   // Newest-first ordering comes from the stores — no sort needed. Only the active tab's list
   // is filtered. Each tab applies its own per-type venue mutes from Settings at DISPLAY time, so
@@ -204,7 +211,10 @@ export const NotificationPanel = memo(function NotificationPanel({
         <TabButton
           id="notif-tab-clusters"
           active={isClusters}
-          onClick={() => onTabChange('clusters')}
+          onClick={() => {
+            if (isClusters) closeLadder(); // clicking the active tab returns to the list
+            onTabChange('clusters');
+          }}
           icon={<ClusterIcon size={15} />}
           label={t('panel.tabs.clusters')}
           title={t('panel.tabs.clustersTitle')}
@@ -212,55 +222,72 @@ export const NotificationPanel = memo(function NotificationPanel({
         />
       </div>
 
-      {/* Search (shared by all tabs) */}
-      <div className="flex-none border-b border-border-subtle px-[14px] py-3">
-        <div className="relative flex items-center">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="pointer-events-none absolute left-[11px] text-text-dim"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('panel.searchPlaceholder')}
-            className="w-full rounded-lg border border-border-input bg-input py-[9px] pr-3 pl-8
-                       font-mono text-[12px] tracking-[0.02em] text-text outline-none
-                       focus:border-accent"
+      {ladder ? (
+        <div
+          role="tabpanel"
+          aria-labelledby="notif-tab-clusters"
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <ClusterLadder
+            key={ladder.cluster.id}
+            initial={ladder}
+            sizeMode={sizeMode}
+            onBack={closeLadder}
           />
         </div>
-      </div>
-
-      {/* List (newest at top) */}
-      <div
-        role="tabpanel"
-        aria-labelledby={`notif-tab-${tab}`}
-        className="scrollbar-slim flex flex-1 flex-col gap-2.5 overflow-y-auto px-[14px] py-[14px]"
-      >
-        {isClusters ? (
-          <ClusterList query={query} sizeMode={sizeMode} />
-        ) : isEmpty ? (
-          <div className="py-7 text-center font-mono text-[12px] tracking-[0.04em] text-text-dim">
-            {isTrades ? t('panel.emptyTrades') : t('panel.empty')}
+      ) : (
+        <>
+          {/* Search (shared by all tabs) */}
+          <div className="flex-none border-b border-border-subtle px-[14px] py-3">
+            <div className="relative flex items-center">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="pointer-events-none absolute left-[11px] text-text-dim"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('panel.searchPlaceholder')}
+                className="w-full rounded-lg border border-border-input bg-input py-[9px] pr-3 pl-8
+                           font-mono text-[12px] tracking-[0.02em] text-text outline-none
+                           focus:border-accent"
+              />
+            </div>
           </div>
-        ) : isTrades ? (
-          visibleTrades.map((tr) => <TradeCard key={tr.id} trade={tr} sizeMode={sizeMode} />)
-        ) : (
-          visibleDepth.map((n) => (
-            <NotificationCard key={n.id} notification={n} sizeMode={sizeMode} />
-          ))
-        )}
-      </div>
+
+          {/* List (newest at top) */}
+          <div
+            role="tabpanel"
+            aria-labelledby={`notif-tab-${tab}`}
+            className="scrollbar-slim flex flex-1 flex-col gap-2.5 overflow-y-auto px-[14px] py-[14px]"
+          >
+            {isClusters ? (
+              <ClusterList query={query} sizeMode={sizeMode} onOpen={setOpenCluster} />
+            ) : isEmpty ? (
+              <div className="py-7 text-center font-mono text-[12px] tracking-[0.04em] text-text-dim">
+                {isTrades ? t('panel.emptyTrades') : t('panel.empty')}
+              </div>
+            ) : isTrades ? (
+              visibleTrades.map((tr) => <TradeCard key={tr.id} trade={tr} sizeMode={sizeMode} />)
+            ) : (
+              visibleDepth.map((n) => (
+                <NotificationCard key={n.id} notification={n} sizeMode={sizeMode} />
+              ))
+            )}
+          </div>
+        </>
+      )}
     </aside>
   );
 });

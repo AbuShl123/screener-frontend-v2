@@ -197,7 +197,8 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
   appeared live, and `feedClient` filters them by muted tickers + depth venue mutes (not the minimum
   tier), then the cooldown. Identity is client-side (`clusterIdentity.ts`: same `firstSeenMillis`
   or enough price overlap). An alert is an unread count; the panel's clusters tab lists what is
-  active now. Backend delivery is off, so the dev server exposes
+  active now, and a card opens its `ClusterLadder` in place of the list (it follows the cluster
+  live and keeps the last levels under a "gone" notice once removed). Backend delivery is off, so the dev server exposes
   `window.__clusterMock` (`src/dev/clusterMock.ts`), which injects raw frames into the real flush.
 - The order book grid itself is expected to eventually bypass React's reconciliation for its
   hottest updates (virtualized DOM first, canvas if profiling demands it) — not yet needed at

@@ -71,27 +71,30 @@ export function fmtBaseQty(q: number): string {
   return q.toFixed(4);
 }
 
-/** Decimal places a number prints with (`139.83` → 2). Exponent notation → `null` (unknown). */
-function printedDecimals(v: number): number | null {
-  const s = String(v);
-  if (s.includes('e')) return null;
-  const dot = s.indexOf('.');
-  return dot === -1 ? 0 : s.length - dot - 1;
+/** Decimal places a number needs in plain notation (`139.83` → 2, `6.2e-7` → 8). */
+function printedDecimals(v: number): number {
+  const [mantissa, exponent = '0'] = String(v).split('e');
+  const dot = mantissa.indexOf('.');
+  const decimals = dot === -1 ? 0 : mantissa.length - dot - 1;
+  return Math.max(0, decimals - Number(exponent));
 }
+
+/** Most decimals ever shown for a price; keeps sub-1e-6 coins from printing as all zeros. */
+const MAX_PRICE_DECIMALS = 12;
 
 /**
  * Decimals for a trade's prices (doc §3.8.6). `firstPrice` / `lastPrice` are exchange prices,
  * so their printed decimals are never cut; `avgPrice` is computed and gets the same count.
  * The magnitude rule (`priceDecimals`) is the floor, so a round exchange price (`93760`) still
- * shows its average with sensible precision. Capped at 8.
+ * shows its average with sensible precision. Capped at `MAX_PRICE_DECIMALS`.
  */
 export function tradePriceDecimals(firstPrice: number, lastPrice: number): number {
   const d = Math.max(
     priceDecimals(firstPrice),
-    printedDecimals(firstPrice) ?? 0,
-    printedDecimals(lastPrice) ?? 0,
+    printedDecimals(firstPrice),
+    printedDecimals(lastPrice),
   );
-  return Math.min(d, 8);
+  return Math.min(d, MAX_PRICE_DECIMALS);
 }
 
 /** Relative size of a trade alert (doc §3.8.3): `notional / threshold`, always ≥ 1. */

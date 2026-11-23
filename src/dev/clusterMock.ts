@@ -58,8 +58,8 @@ const arbBid = (levelNotional: number): WireCluster =>
 const arbAsk = (): WireCluster =>
   wall({ from: 0.078, step: 0.0001, count: 24, levelNotional: 90_000, distance: 0.0183, firstSeenMillis: FIRST_SEEN });
 /** At the backend's 200-level cap, for checking the ladder's render cost. */
-const solAsk = (): WireCluster =>
-  wall({ from: 182, step: 0.01, count: 200, levelNotional: 60_000, distance: 0.0041, firstSeenMillis: FIRST_SEEN });
+const solAsk = (levelNotional = 60_000): WireCluster =>
+  wall({ from: 182, step: 0.01, count: 200, levelNotional, distance: 0.0041, firstSeenMillis: FIRST_SEEN });
 
 const clusterFrame = (instrument: Instrument, data: WireData | null) =>
   ({ type: 'CLUSTER', ...instrument, data });
@@ -86,6 +86,8 @@ const clusterMock = {
   otherSide: () => send(clusterFrame(ARB, { bidClusters: [arbBid(125_000)], askClusters: [arbAsk()] })),
   /** A 200-level wall on another instrument. */
   appearLarge: () => send(clusterFrame(SOL, { bidClusters: [], askClusters: [solAsk()] })),
+  /** The same wall, every level 25% larger. */
+  updateLarge: () => send(clusterFrame(SOL, { bidClusters: [], askClusters: [solAsk(75_000)] })),
   /** Explicit removals (`data: null`). */
   remove: () => send(clusterFrame(ARB, null)),
   removeLarge: () => send(clusterFrame(SOL, null)),

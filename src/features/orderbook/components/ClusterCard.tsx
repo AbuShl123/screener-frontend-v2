@@ -12,7 +12,7 @@ import {
 import { exchangeMeta, useExchangeRegistry } from '@/features/orderbook/exchanges';
 import { ExchangeLogo } from '@/features/orderbook/components/ExchangeLogo';
 import { Metric } from '@/features/orderbook/components/NotificationCard';
-import type { Exchange, Market, TrackedCluster } from '@/features/orderbook/types';
+import type { ActiveCluster, Exchange, Market, TrackedCluster } from '@/features/orderbook/types';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 
 interface ClusterCardProps {
@@ -24,6 +24,7 @@ interface ClusterCardProps {
   sizeMode: SizeMode;
   /** The list's clock (epoch ms), for the age. */
   now: number;
+  onOpen: (cluster: ActiveCluster) => void;
 }
 
 /**
@@ -39,6 +40,7 @@ export const ClusterCard = memo(function ClusterCard({
   cluster: c,
   sizeMode,
   now,
+  onOpen,
 }: ClusterCardProps) {
   const { t } = useTranslation('orderbook');
   useExchangeRegistry((s) => s.version);
@@ -57,7 +59,17 @@ export const ClusterCard = memo(function ClusterCard({
     : 'text-danger border-danger/40 bg-danger/12';
 
   return (
-    <div className="flex shrink-0 flex-col gap-[11px] rounded-[10px] border border-border bg-input px-[14px] pt-3 pb-[13px]">
+    <div className="relative flex shrink-0 flex-col gap-[11px] rounded-[10px] border border-border bg-input px-[14px] pt-3 pb-[13px] transition-colors hover:border-border-input">
+      {/* Stretched over the card: the card's block content can't live inside a <button>. */}
+      <button
+        type="button"
+        onClick={() => onOpen({ exchange, market, symbol, side, cluster: c })}
+        aria-label={t('cluster.open', {
+          symbol: fmtSymbol(symbol),
+          side: isBid ? t('notification.side.bid') : t('notification.side.ask'),
+        })}
+        className="absolute inset-0 z-10 cursor-pointer rounded-[10px]"
+      />
       {/* Row 1: exchange + symbol + market  /  age */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-[9px]">
@@ -76,10 +88,7 @@ export const ClusterCard = memo(function ClusterCard({
             {badge.label}
           </span>
         </div>
-        <span
-          title={t('cluster.age', { age })}
-          className="flex-none font-mono text-[11px] tracking-[0.04em] text-text-muted"
-        >
+        <span className="flex-none font-mono text-[11px] tracking-[0.04em] text-text-muted">
           {age}
         </span>
       </div>

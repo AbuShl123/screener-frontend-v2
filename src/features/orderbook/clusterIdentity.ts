@@ -1,4 +1,4 @@
-import type { Cluster, TrackedCluster } from '@/features/orderbook/types';
+import type { ActiveCluster, Cluster, TrackedCluster } from '@/features/orderbook/types';
 
 /**
  * Following a cluster across updates (doc §3.9.1). The wire carries no id, but the same cluster
@@ -80,4 +80,32 @@ export function trackClusters(
     return { ...cluster, id: match && inherits(i) ? match.id : `cluster-${++lastId}` };
   });
   return { tracked, added: tracked.filter((_, i) => matches[i] === undefined) };
+}
+
+/**
+ * Where a cluster being looked at is now: the active one with its id, else one on the same
+ * instrument and side covering the same range (it merged into an older wall, or was pulled and
+ * came back), else undefined — it is gone.
+ */
+export function followCluster(
+  active: readonly ActiveCluster[],
+  last: ActiveCluster,
+): ActiveCluster | undefined {
+  const sameSide = active.filter(
+    (a) =>
+      a.exchange === last.exchange &&
+      a.market === last.market &&
+      a.symbol === last.symbol &&
+      a.side === last.side,
+  );
+  const id = last.cluster.id;
+  return (
+    sameSide.find((a) => a.cluster.id === id) ??
+    sameSide
+      .filter((a) => isSameRange(a.cluster, last.cluster))
+      .sort(
+        (a, b) =>
+          overlapWidth(b.cluster, last.cluster) - overlapWidth(a.cluster, last.cluster),
+      )[0]
+  );
 }

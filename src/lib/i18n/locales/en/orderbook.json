@@ -72,10 +72,16 @@
     }
   },
   "cluster": {
-    "age": "Active for {{age}}",
+    "open": "Open the {{symbol}} {{side}} cluster",
+    "back": "All clusters",
+    "gone": "This cluster is gone. Showing its last known levels.",
+    "distanceHint": "Distance from mid as of the last update",
     "metric": {
       "range": "PRICE RANGE",
-      "levels": "LEVELS"
+      "levels": "LEVELS",
+      "notional": "TOTAL NOTIONAL",
+      "qty": "TOTAL QTY",
+      "age": "AGE"
     }
   },
   "panel": {

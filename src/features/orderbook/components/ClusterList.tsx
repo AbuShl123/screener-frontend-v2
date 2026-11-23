@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClusterCard } from '@/features/orderbook/components/ClusterCard';
+import { useNow } from '@/features/orderbook/components/useNow';
 import { matchesCluster } from '@/features/orderbook/notifications/clusterSearch';
 import { isClusterMuted } from '@/features/orderbook/notifications/settingsFilter';
 import type { ActiveCluster } from '@/features/orderbook/types';
@@ -21,7 +21,16 @@ const compareClusters = (a: ActiveCluster, b: ActiveCluster): number =>
  * The clusters tab: every currently active, unmuted cluster. This is live state, not a log, so a
  * pulled or filled cluster simply leaves the list. Mounted only while its tab is selected.
  */
-export function ClusterList({ query, sizeMode }: { query: string; sizeMode: SizeMode }) {
+export function ClusterList({
+  query,
+  sizeMode,
+  onOpen,
+}: {
+  query: string;
+  sizeMode: SizeMode;
+  /** Open a cluster's ladder. Must be stable (the cards are memoized). */
+  onOpen: (cluster: ActiveCluster) => void;
+}) {
   const { t } = useTranslation('orderbook');
   const active = useClusterStore(selectActiveClusters);
   const muted = useNotificationSettingsStore((s) => s.muted);
@@ -40,15 +49,13 @@ export function ClusterList({ query, sizeMode }: { query: string; sizeMode: Size
     );
   }
   return visible.map(({ cluster, ...instrument }) => (
-    <ClusterCard key={cluster.id} {...instrument} cluster={cluster} sizeMode={sizeMode} now={now} />
+    <ClusterCard
+      key={cluster.id}
+      {...instrument}
+      cluster={cluster}
+      sizeMode={sizeMode}
+      now={now}
+      onOpen={onOpen}
+    />
   ));
-}
-
-function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-  return now;
 }
