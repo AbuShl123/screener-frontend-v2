@@ -71,6 +71,19 @@
       "exceptional": "Exceptional"
     }
   },
+  "cluster": {
+    "open": "Open the {{symbol}} {{side}} cluster",
+    "back": "All clusters",
+    "gone": "This cluster is gone. Showing its last known levels.",
+    "distanceHint": "Distance from mid as of the last update",
+    "metric": {
+      "range": "PRICE RANGE",
+      "levels": "LEVELS",
+      "notional": "TOTAL NOTIONAL",
+      "qty": "TOTAL QTY",
+      "age": "AGE"
+    }
+  },
   "panel": {
     "title": "Notifications",
     "clearAll": "Clear all notifications",
@@ -82,13 +95,18 @@
     "tabs": {
       "label": "Alert type",
       "depth": "Order book",
-      "trades": "Large trades",
+      "trades": "Trades",
       "depthTitle": "Order book alerts",
-      "tradesTitle": "Large trade alerts"
+      "tradesTitle": "Large trade alerts",
+      "clusters": "Clusters",
+      "clustersTitle": "Active order clusters"
     },
     "searchPlaceholder": "Search ticker, price, size…",
     "empty": "No matching notifications",
-    "emptyTrades": "No matching trade alerts"
+    "emptyTrades": "No matching trade alerts",
+    "openClusters": "Open order clusters",
+    "emptyClusters": "No active clusters",
+    "emptyClustersSearch": "No matching clusters"
   },
   "dashboard": {
     "reconnecting": "Reconnecting to the feed…",

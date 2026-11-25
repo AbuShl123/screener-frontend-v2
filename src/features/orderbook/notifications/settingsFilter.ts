@@ -1,6 +1,7 @@
 import {
   bookKey,
   venueKey,
+  type ActiveCluster,
   type FeedMessage,
   type Market,
   type Notification,
@@ -17,7 +18,7 @@ import {
  *
  * Venue mutes are per alert type: `mutedVenues` silences a venue's order book (depth)
  * notifications, `mutedTradeVenues` its large-trade alerts. The minimum tier and the muted
- * tickers apply to depth notifications only. The header's exchange filter is NOT a
+ * tickers never apply to trades; clusters follow the muted tickers and the depth venue mutes. The header's exchange filter is NOT a
  * notification filter (it hides order book cards only), so nothing here reads it.
  *
  * Pure and store-agnostic: callers pass the settings in, so `orderbook` gains no dependency on
@@ -50,8 +51,8 @@ export function filterBySettings(
 /**
  * The batch handed to `useTradeStore.ingest()`, minus trade alerts from trade-muted venues
  * (live `TRADE`s and a `SNAPSHOT`'s replayed `trades`). Returns `batch` itself when nothing is
- * muted (the common case) and copies a snapshot only when it actually loses a trade. Depth
- * entries pass through untouched — the trade store ignores them anyway.
+ * muted (the common case) and copies a snapshot only when it actually loses a trade. Depth and
+ * cluster entries pass through untouched — the trade store ignores them anyway.
  */
 export function dropMutedTrades(
   batch: readonly FeedMessage[],
@@ -82,6 +83,31 @@ export function isVenueMuted(
   mutedVenues: readonly string[],
 ): boolean {
   return mutedVenues.length > 0 && mutedVenues.includes(venueKey(n.exchange, n.market));
+}
+
+/**
+ * Clusters are tied to instruments like depth, so the muted tickers and the order book (depth)
+ * venue mutes apply to them. They have no tier, so the minimum tier doesn't.
+ */
+export function isClusterMuted(
+  c: ActiveCluster,
+  muted: readonly string[],
+  mutedVenues: readonly string[],
+): boolean {
+  return isVenueMuted(c, mutedVenues) || muted.includes(bookKey(c.symbol, c.market));
+}
+
+/** Unread clusters that are not muted. `unread` is empty or tiny almost all the time. */
+export function countUnreadClusters(
+  active: readonly ActiveCluster[],
+  unread: readonly string[],
+  muted: readonly string[],
+  mutedVenues: readonly string[],
+): number {
+  if (unread.length === 0) return 0;
+  return active.filter(
+    (c) => unread.includes(c.cluster.id) && !isClusterMuted(c, muted, mutedVenues),
+  ).length;
 }
 
 /**

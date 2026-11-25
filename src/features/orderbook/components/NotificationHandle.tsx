@@ -1,7 +1,11 @@
 import { memo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DepthIcon, TradeIcon } from '@/features/orderbook/components/alertIcons';
-import { useDepthUnread, useTradeUnread } from '@/features/orderbook/notifications/useUnreadCounts';
+import { ClusterIcon, DepthIcon, TradeIcon } from '@/features/orderbook/components/alertIcons';
+import {
+  useClusterUnread,
+  useDepthUnread,
+  useTradeUnread,
+} from '@/features/orderbook/notifications/useUnreadCounts';
 
 interface NotificationHandleProps {
   /** Whether the panel is open — drives the fade (open ⇒ faded out, non-interactive). */
@@ -10,12 +14,14 @@ interface NotificationHandleProps {
   onOpenDepth: () => void;
   /** Open the panel on the large-trades tab. */
   onOpenTrades: () => void;
+  /** Open the panel on the clusters tab. */
+  onOpenClusters: () => void;
 }
 
 /**
  * Collapsed notification handles — one fixed accent pill per alert stream, stacked on the
  * right edge and visible only when the panel is closed (design template "Dashboard Page
- * Template - Final"): 48×48, a depth-ladder glyph and a lightning glyph, each with a white
+ * Template - Final"): 48×48, a depth-ladder, a lightning and a stacked-levels glyph, each with a white
  * unread badge notched into the corner. Each opens the panel on its own tab. Kept
  * mounted-but-faded (rather than unmounted) so the fade cross-dissolves with the panel slide.
  *
@@ -26,6 +32,7 @@ export const NotificationHandle = memo(function NotificationHandle({
   open,
   onOpenDepth,
   onOpenTrades,
+  onOpenClusters,
 }: NotificationHandleProps) {
   return (
     // 36px below the header (was `top-24` = 96px under the 60px header), via `--header-h`.
@@ -37,6 +44,7 @@ export const NotificationHandle = memo(function NotificationHandle({
     >
       <DepthHandle onOpen={onOpenDepth} />
       <TradeHandle onOpen={onOpenTrades} />
+      <ClusterHandle onOpen={onOpenClusters} />
     </div>
   );
 });
@@ -66,6 +74,20 @@ function TradeHandle({ onOpen }: { onOpen: () => void }) {
       ariaLabel={t('panel.openTrades')}
       onClick={onOpen}
       icon={<TradeIcon size={20} strokeWidth={1.8} />}
+      unread={unread}
+    />
+  );
+}
+
+function ClusterHandle({ onOpen }: { onOpen: () => void }) {
+  const { t } = useTranslation('orderbook');
+  const unread = useClusterUnread();
+  return (
+    <HandleButton
+      title={t('panel.tabs.clustersTitle')}
+      ariaLabel={t('panel.openClusters')}
+      onClick={onOpen}
+      icon={<ClusterIcon size={20} strokeWidth={1.8} />}
       unread={unread}
     />
   );

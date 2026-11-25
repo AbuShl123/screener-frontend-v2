@@ -1,8 +1,10 @@
 import {
+  countUnreadClusters,
   countUnreadTrades,
   countVisibleUnread,
 } from '@/features/orderbook/notifications/settingsFilter';
 import { useNotificationSettingsStore } from '@/features/settings';
+import { useClusterStore } from '@/stores/clusterStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useTradeStore } from '@/stores/tradeStore';
 
@@ -26,4 +28,11 @@ export function useDepthUnread(): number {
 export function useTradeUnread(): number {
   const mutedTradeVenues = useNotificationSettingsStore((s) => s.mutedTradeVenues);
   return useTradeStore((s) => countUnreadTrades(s.trades, s.readSeq, mutedTradeVenues));
+}
+
+/** Unread clusters that are visible: active, not yet seen, not muted. */
+export function useClusterUnread(): number {
+  const muted = useNotificationSettingsStore((s) => s.muted);
+  const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
+  return useClusterStore((s) => countUnreadClusters(s.active, s.unread, muted, mutedVenues));
 }

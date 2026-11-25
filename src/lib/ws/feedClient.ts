@@ -1,9 +1,14 @@
 import { config } from '@/config/env';
 import { refreshTokens, useSession } from '@/features/auth';
-import { filterAnnounced, resetCooldown } from '@/features/orderbook/notifications/cooldown';
+import {
+  filterAnnounced,
+  filterAnnouncedClusters,
+  resetCooldown,
+} from '@/features/orderbook/notifications/cooldown';
 import {
   dropMutedTrades,
   filterBySettings,
+  isClusterMuted,
 } from '@/features/orderbook/notifications/settingsFilter';
 import {
   isValidExchangeId,
@@ -12,6 +17,10 @@ import {
   type Exchange,
 } from '@/features/orderbook/exchanges';
 import type {
+  Cluster,
+  ClusterData,
+  ClusterLevel,
+  ClusterMessage,
   DepthMessage,
   FeedMessage,
   Level,
@@ -19,6 +28,7 @@ import type {
   TradeMessage,
 } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '@/features/settings';
+import { useClusterStore } from '@/stores/clusterStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
 import { useTradeStore } from '@/stores/tradeStore';
@@ -28,7 +38,8 @@ import { useTradeStore } from '@/stores/tradeStore';
  * that owns the socket, reconnection, and message coalescing. Framework-agnostic
  * — no React imports — exactly like `session.ts`. It reads tokens synchronously
  * from `useSession.getState()` (why tokens live in Zustand) and writes books into
- * `useOrderbookStore` and large-trade alerts into `useTradeStore`.
+ * `useOrderbookStore`, large-trade alerts into `useTradeStore` and order clusters into
+ * `useClusterStore`.
  * Protocol: `.claude/docs/websocket-feed-api.md`.
  *
  * Public API is two idempotent functions; `useOrderbookFeed` drives them from a
@@ -79,6 +90,7 @@ export function stopFeed(): void {
   // next session (plan §6c). Harmless under StrictMode's mount→unmount→mount.
   useNotificationStore.getState().clear();
   useTradeStore.getState().reset();
+  useClusterStore.getState().reset();
   // Forget cooldown history too, so the next session isn't silenced by the last one's.
   resetCooldown();
   if (ws) {
@@ -209,6 +221,14 @@ function failAuth(): void {
 
 // ── Message ingestion: parse → cheap structural guard → buffer ──
 
+/**
+ * DEV ONLY (`src/dev/clusterMock.ts`): feed a raw frame through the same parse → guard → buffer
+ * → flush path as a socket message. Production builds tree-shake it away with its only caller.
+ */
+export function injectRawMessage(raw: string): void {
+  handleRawMessage(raw);
+}
+
 function handleRawMessage(raw: unknown): void {
   if (typeof raw !== 'string') return;
 
@@ -277,17 +297,20 @@ function coerceMessage(json: unknown): FeedMessage | null {
 
   if (m.type === 'SNAPSHOT') {
     // Entries mix types in no particular order (doc §3.2); split them so the order book
-    // store gets the depth state and the trade store the replayed alerts.
+    // store gets the depth state, the trade store the replayed alerts and the cluster store
+    // the cluster state.
     const entries = Array.isArray(m.data) ? m.data : [];
     const data: DepthMessage[] = [];
     const trades: TradeMessage[] = [];
+    const clusters: ClusterMessage[] = [];
     for (const entry of entries) {
       const env = coerceEnvelope(entry);
       if (!env) continue;
       if (env.type === 'DEPTH') data.push(env);
-      else trades.push(env);
+      else if (env.type === 'TRADE') trades.push(env);
+      else clusters.push(env);
     }
-    return { type: 'SNAPSHOT', data, trades };
+    return { type: 'SNAPSHOT', data, trades, clusters };
   }
 
   return coerceEnvelope(json);
@@ -298,13 +321,14 @@ function coerceMessage(json: unknown): FeedMessage | null {
  * - unknown `type`s, SILENTLY — new types ship without a coordinated release (doc §4.2);
  * - exchanges rejected by `acceptExchange` (malformed id / registry full), warning once in dev;
  * - malformed envelopes (bad identity fields, `DEPTH` data neither null nor `{ bids, asks }`,
- *   `TRADE` data missing a required field).
+ *   `TRADE` data missing a required field, `CLUSTER` data neither null nor holding a cluster
+ *   array).
  */
-function coerceEnvelope(json: unknown): DepthMessage | TradeMessage | null {
+function coerceEnvelope(json: unknown): DepthMessage | TradeMessage | ClusterMessage | null {
   if (typeof json !== 'object' || json === null) return dropMalformed(json);
   const m = json as Record<string, unknown>;
 
-  if (m.type !== 'DEPTH' && m.type !== 'TRADE') return null;
+  if (m.type !== 'DEPTH' && m.type !== 'TRADE' && m.type !== 'CLUSTER') return null;
   if (typeof m.exchange !== 'string' || typeof m.symbol !== 'string' || !isMarket(m.market)) {
     return dropMalformed(json);
   }
@@ -312,6 +336,7 @@ function coerceEnvelope(json: unknown): DepthMessage | TradeMessage | null {
   if (!acceptExchange(m.exchange, m.market)) return null;
 
   if (m.type === 'TRADE') return coerceTrade(json, m.exchange, m.market, m.symbol, m.data);
+  if (m.type === 'CLUSTER') return coerceCluster(json, m.exchange, m.market, m.symbol, m.data);
 
   const identity = { type: 'DEPTH', exchange: m.exchange, market: m.market, symbol: m.symbol } as const;
   if (m.data === null) return { ...identity, data: null };
@@ -363,6 +388,75 @@ function coerceTrade(
     market,
     symbol,
     data: { id, side, time, notional, qty, avgPrice, firstPrice, lastPrice, levels, threshold },
+  };
+}
+
+/**
+ * Guard + decode a `CLUSTER`'s `data` (doc §3.9). `null` is an explicit removal and survives;
+ * anything else that isn't usable is dropped, so a malformed payload never removes clusters.
+ * A missing side falls back to `[]`, and a single bad cluster is skipped, like a bad level.
+ */
+function coerceCluster(
+  json: unknown,
+  exchange: Exchange,
+  market: Market,
+  symbol: string,
+  data: unknown,
+): ClusterMessage | null {
+  const identity = { type: 'CLUSTER', exchange, market, symbol } as const;
+  if (data === null) return { ...identity, data: null };
+  if (typeof data !== 'object') return dropMalformed(json);
+
+  const d = data as Record<string, unknown>;
+  if (!Array.isArray(d.bidClusters) && !Array.isArray(d.askClusters)) return dropMalformed(json);
+  const bids: unknown[] = Array.isArray(d.bidClusters) ? d.bidClusters : [];
+  const asks: unknown[] = Array.isArray(d.askClusters) ? d.askClusters : [];
+
+  const decoded: ClusterData = {
+    bidClusters: decodeClusters(bids),
+    askClusters: decodeClusters(asks),
+  };
+  // Entries arrived but none was readable: that's malformed, not "no clusters any more".
+  const received = bids.length + asks.length;
+  if (received > 0 && decoded.bidClusters.length + decoded.askClusters.length === 0) {
+    return dropMalformed(json);
+  }
+  return { ...identity, data: decoded };
+}
+
+/** Copies only the known fields, so fields the server adds later are ignored (doc §3.9). */
+function decodeClusters(entries: readonly unknown[]): Cluster[] {
+  const clusters: Cluster[] = [];
+  for (const entry of entries) {
+    const cluster = decodeCluster(entry);
+    if (cluster) clusters.push(cluster);
+  }
+  return clusters;
+}
+
+function decodeCluster(entry: unknown): Cluster | null {
+  if (typeof entry !== 'object' || entry === null) return dropMalformed(entry);
+  const { priceFrom, priceTo, levelCount, totalNotional, totalQuantity, distance, firstSeenMillis, levels } =
+    entry as Record<string, unknown>;
+  if (
+    !isNum(priceFrom) ||
+    !isNum(priceTo) ||
+    !isNum(levelCount) ||
+    !isNum(totalNotional) ||
+    !isNum(totalQuantity) ||
+    !isNum(distance) ||
+    !isNum(firstSeenMillis) ||
+    !Array.isArray(levels)
+  ) {
+    return dropMalformed(entry);
+  }
+  const ladder: ClusterLevel[] = [];
+  for (const t of levels as unknown[]) {
+    if (Array.isArray(t) && isNum(t[0]) && isNum(t[1])) ladder.push({ price: t[0], quantity: t[1] });
+  }
+  return {
+    priceFrom, priceTo, levelCount, totalNotional, totalQuantity, distance, firstSeenMillis,
+    levels: ladder,
   };
 }
 
@@ -424,6 +518,14 @@ function flush(): void {
   // Trade alerts first: they are independent of the order book. Only the trade venue mutes
   // apply to them (the minimum tier, muted tickers and depth venue mutes never do).
   useTradeStore.getState().ingest(dropMutedTrades(batch, mutedTradeVenues));
+  // Clusters are stored unfiltered, like books; only their alerts are filtered, mutes before
+  // cooldown for the same reason as depth below.
+  const appeared = useClusterStore.getState().applyMessages(batch);
+  useClusterStore
+    .getState()
+    .announce(
+      filterAnnouncedClusters(appeared.filter((c) => !isClusterMuted(c, muted, mutedVenues))),
+    );
   const candidates = useOrderbookStore.getState().applyMessages(batch);
   // Push-boundary filter: drop muted-ticker / depth-muted-venue / below-minTier candidates
   // BEFORE cooldown, so they never write a cooldown entry (un-muting later lets that order
