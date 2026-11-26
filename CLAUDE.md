@@ -190,6 +190,13 @@ useNotificationStore (Zustand, OUTSIDE React) ──► NotificationPanel / Noti
   next snapshot doesn't bring them back. **Only the Settings trade venue mutes apply to trades**
   (`mutedTradeVenues`: dropped before `ingest`, hidden at display time) — muted tickers, the
   minimum tier and the header exchange filter do not. No toasts/sounds yet.
+- **Price / volume spikes** (`PRICE_SPIKE` / `VOLUME_SPIKE`, doc §3.10) follow the trade-alert
+  model exactly: the guard splits a `SNAPSHOT`'s spike entries into `spikes`, each flush hands the
+  batch to `useSpikeStore.ingest()` (`src/stores/spikeStore.ts`), merged by `id`, sorted by `time`,
+  capped at 300, `seq > readSeq` unread, cleared ids remembered. Stored as one `SpikeAlert` union
+  discriminated by `kind` (`PRICE` / `VOLUME`); a volume `pct` is `null` when the previous window
+  traded nothing. No Settings mute applies yet. The panel's fourth tab renders them with
+  `SpikeCard`; the dev server exposes `window.__spikeMock` (`src/dev/spikeMock.ts`).
 - **Order clusters** (`CLUSTER`, doc §3.9) are **state, like depth, not history like trades**: each
   message replaces that `(exchange, market, symbol)` instrument's whole set in `useClusterStore`
   (`src/stores/clusterStore.ts`), `data: null` removes it, and a `SNAPSHOT` replaces the whole
@@ -347,9 +354,9 @@ components or pages.
   trades-tab counterpart.
 - **`notifications/useUnreadCounts.ts`** — `useDepthUnread()` / `useTradeUnread()`, the visible
   unread counts shared by the handle badges and the tab chips.
-- **Notification panel tabs:** `NotificationPanel` has three tabs, order book (depth), large
-  trades and active clusters (`ClusterList` → `ClusterCard`); `DashboardPage` owns the active tab next to `notifOpen`, because each of the three
-  collapsed handles (`NotificationHandle`: depth ladder, lightning, stack) opens the panel on its own
+- **Notification panel tabs:** `NotificationPanel` has four tabs, order book (depth), large
+  trades, active clusters (`ClusterList` → `ClusterCard`) and price/volume spikes (`SpikeCard`); `DashboardPage` owns the active tab next to `notifOpen`, because each of the four
+  collapsed handles (`NotificationHandle`: depth ladder, lightning, stack, spike line) opens the panel on its own
   tab. While the panel is open on a tab, that stream's store is told it's being viewed
   (`setViewing`) and counts nothing as unread, so only an inactive tab shows a chip (hidden at
   0); the shared search and "Clear all" act on the active tab. `TradeCard` (memoized — alerts never change) renders a

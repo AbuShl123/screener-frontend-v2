@@ -25,12 +25,14 @@ import type {
   FeedMessage,
   Level,
   Market,
+  SpikeMessage,
   TradeMessage,
 } from '@/features/orderbook/types';
 import { useNotificationSettingsStore } from '@/features/settings';
 import { useClusterStore } from '@/stores/clusterStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useOrderbookStore } from '@/stores/orderbookStore';
+import { useSpikeStore } from '@/stores/spikeStore';
 import { useTradeStore } from '@/stores/tradeStore';
 
 /**
@@ -38,8 +40,8 @@ import { useTradeStore } from '@/stores/tradeStore';
  * that owns the socket, reconnection, and message coalescing. Framework-agnostic
  * — no React imports — exactly like `session.ts`. It reads tokens synchronously
  * from `useSession.getState()` (why tokens live in Zustand) and writes books into
- * `useOrderbookStore`, large-trade alerts into `useTradeStore` and order clusters into
- * `useClusterStore`.
+ * `useOrderbookStore`, large-trade alerts into `useTradeStore`, order clusters into
+ * `useClusterStore` and price/volume spikes into `useSpikeStore`.
  * Protocol: `.claude/docs/websocket-feed-api.md`.
  *
  * Public API is two idempotent functions; `useOrderbookFeed` drives them from a
@@ -90,6 +92,7 @@ export function stopFeed(): void {
   // next session (plan §6c). Harmless under StrictMode's mount→unmount→mount.
   useNotificationStore.getState().clear();
   useTradeStore.getState().reset();
+  useSpikeStore.getState().reset();
   useClusterStore.getState().reset();
   // Forget cooldown history too, so the next session isn't silenced by the last one's.
   resetCooldown();
@@ -303,14 +306,16 @@ function coerceMessage(json: unknown): FeedMessage | null {
     const data: DepthMessage[] = [];
     const trades: TradeMessage[] = [];
     const clusters: ClusterMessage[] = [];
+    const spikes: SpikeMessage[] = [];
     for (const entry of entries) {
       const env = coerceEnvelope(entry);
       if (!env) continue;
       if (env.type === 'DEPTH') data.push(env);
       else if (env.type === 'TRADE') trades.push(env);
-      else clusters.push(env);
+      else if (env.type === 'CLUSTER') clusters.push(env);
+      else spikes.push(env);
     }
-    return { type: 'SNAPSHOT', data, trades, clusters };
+    return { type: 'SNAPSHOT', data, trades, clusters, spikes };
   }
 
   return coerceEnvelope(json);
@@ -322,13 +327,23 @@ function coerceMessage(json: unknown): FeedMessage | null {
  * - exchanges rejected by `acceptExchange` (malformed id / registry full), warning once in dev;
  * - malformed envelopes (bad identity fields, `DEPTH` data neither null nor `{ bids, asks }`,
  *   `TRADE` data missing a required field, `CLUSTER` data neither null nor holding a cluster
- *   array).
+ *   array, a spike's data missing a required field).
  */
-function coerceEnvelope(json: unknown): DepthMessage | TradeMessage | ClusterMessage | null {
+function coerceEnvelope(
+  json: unknown,
+): DepthMessage | TradeMessage | ClusterMessage | SpikeMessage | null {
   if (typeof json !== 'object' || json === null) return dropMalformed(json);
   const m = json as Record<string, unknown>;
 
-  if (m.type !== 'DEPTH' && m.type !== 'TRADE' && m.type !== 'CLUSTER') return null;
+  if (
+    m.type !== 'DEPTH' &&
+    m.type !== 'TRADE' &&
+    m.type !== 'CLUSTER' &&
+    m.type !== 'PRICE_SPIKE' &&
+    m.type !== 'VOLUME_SPIKE'
+  ) {
+    return null;
+  }
   if (typeof m.exchange !== 'string' || typeof m.symbol !== 'string' || !isMarket(m.market)) {
     return dropMalformed(json);
   }
@@ -337,6 +352,9 @@ function coerceEnvelope(json: unknown): DepthMessage | TradeMessage | ClusterMes
 
   if (m.type === 'TRADE') return coerceTrade(json, m.exchange, m.market, m.symbol, m.data);
   if (m.type === 'CLUSTER') return coerceCluster(json, m.exchange, m.market, m.symbol, m.data);
+  if (m.type === 'PRICE_SPIKE' || m.type === 'VOLUME_SPIKE') {
+    return coerceSpike(json, m.type, m.exchange, m.market, m.symbol, m.data);
+  }
 
   const identity = { type: 'DEPTH', exchange: m.exchange, market: m.market, symbol: m.symbol } as const;
   if (m.data === null) return { ...identity, data: null };
@@ -388,6 +406,42 @@ function coerceTrade(
     market,
     symbol,
     data: { id, side, time, notional, qty, avgPrice, firstPrice, lastPrice, levels, threshold },
+  };
+}
+
+/**
+ * Guard + decode a `PRICE_SPIKE` / `VOLUME_SPIKE`'s `data` (doc §3.10). Only the known fields are
+ * copied, like `coerceTrade`. A volume spike's `pct` may be `null` (previous window traded nothing).
+ */
+function coerceSpike(
+  json: unknown,
+  type: 'PRICE_SPIKE' | 'VOLUME_SPIKE',
+  exchange: Exchange,
+  market: Market,
+  symbol: string,
+  data: unknown,
+): SpikeMessage | null {
+  if (typeof data !== 'object' || data === null) return dropMalformed(json);
+  const d = data as Record<string, unknown>;
+  const { id, time, pct, windowSec } = d;
+  if (typeof id !== 'string' || !isNum(time) || !isNum(windowSec)) return dropMalformed(json);
+
+  if (type === 'PRICE_SPIKE') {
+    const { direction, fromPrice, toPrice } = d;
+    if ((direction !== 'UP' && direction !== 'DOWN') || !isNum(pct) || !isNum(fromPrice) || !isNum(toPrice)) {
+      return dropMalformed(json);
+    }
+    return {
+      type, exchange, market, symbol,
+      data: { id, time, direction, pct, fromPrice, toPrice, windowSec },
+    };
+  }
+
+  const { prevVolume, volume } = d;
+  if ((pct !== null && !isNum(pct)) || !isNum(prevVolume) || !isNum(volume)) return dropMalformed(json);
+  return {
+    type, exchange, market, symbol,
+    data: { id, time, pct, prevVolume, volume, windowSec },
   };
 }
 
@@ -518,6 +572,8 @@ function flush(): void {
   // Trade alerts first: they are independent of the order book. Only the trade venue mutes
   // apply to them (the minimum tier, muted tickers and depth venue mutes never do).
   useTradeStore.getState().ingest(dropMutedTrades(batch, mutedTradeVenues));
+  // Spikes are events like trades, and not filtered by any Settings mute yet.
+  useSpikeStore.getState().ingest(batch);
   // Clusters are stored unfiltered, like books; only their alerts are filtered, mutes before
   // cooldown for the same reason as depth below.
   const appeared = useClusterStore.getState().applyMessages(batch);

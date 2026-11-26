@@ -2,14 +2,22 @@ import { memo, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotificationCard } from '@/features/orderbook/components/NotificationCard';
 import { TradeCard } from '@/features/orderbook/components/TradeCard';
+import { SpikeCard } from '@/features/orderbook/components/SpikeCard';
 import { ClusterLadder } from '@/features/orderbook/components/ClusterLadder';
 import { ClusterList } from '@/features/orderbook/components/ClusterList';
-import { ClusterIcon, DepthIcon, TradeIcon } from '@/features/orderbook/components/alertIcons';
+import {
+  ClusterIcon,
+  DepthIcon,
+  SpikeIcon,
+  TradeIcon,
+} from '@/features/orderbook/components/alertIcons';
 import { matches } from '@/features/orderbook/notifications/notificationSearch';
 import { matchesTrade } from '@/features/orderbook/notifications/tradeSearch';
+import { matchesSpike } from '@/features/orderbook/notifications/spikeSearch';
 import {
   useClusterUnread,
   useDepthUnread,
+  useSpikeUnread,
   useTradeUnread,
 } from '@/features/orderbook/notifications/useUnreadCounts';
 import { isVenueMuted } from '@/features/orderbook/notifications/settingsFilter';
@@ -19,6 +27,7 @@ import { useNotificationSettingsStore } from '@/features/settings';
 import type { SizeMode } from '@/features/orderbook/pages/DashboardPage';
 import { useClusterStore } from '@/stores/clusterStore';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useSpikeStore } from '@/stores/spikeStore';
 import { useTradeStore } from '@/stores/tradeStore';
 
 /**
@@ -28,8 +37,8 @@ import { useTradeStore } from '@/stores/tradeStore';
  */
 export const PANEL_WIDTH = 340;
 
-/** The panel's alert streams, one tab each (spikes will join here later). */
-export type NotificationTab = 'depth' | 'trades' | 'clusters';
+/** The panel's alert streams, one tab each. */
+export type NotificationTab = 'depth' | 'trades' | 'clusters' | 'spikes';
 
 interface NotificationPanelProps {
   open: boolean;
@@ -46,7 +55,8 @@ interface NotificationPanelProps {
  * isn't rebuilt on every toggle. This is conventional UI (CLAUDE.md), so plain React
  * state is correct — the search state is not on the real-time hot path.
  *
- * Three tabs: order book (depth) notifications, large-trade alerts and the active clusters. The
+ * Four tabs: order book (depth) notifications, large-trade alerts, the active clusters and price /
+ * volume spikes. The
  * Clear button and the shared search act on the active tab (clusters are live state, so they
  * have nothing to clear). The active tab is always read (its arrivals are on
  * screen), so only an inactive tab's chip can show an unread count.
@@ -76,9 +86,13 @@ export const NotificationPanel = memo(function NotificationPanel({
   const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
   const mutedTradeVenues = useNotificationSettingsStore((s) => s.mutedTradeVenues);
   const setClustersViewing = useClusterStore((s) => s.setViewing);
+  const spikes = useSpikeStore((s) => s.spikes);
+  const setSpikesViewing = useSpikeStore((s) => s.setViewing);
+  const clearSpikes = useSpikeStore((s) => s.clear);
   const depthUnread = useDepthUnread();
   const tradeUnread = useTradeUnread();
   const clusterUnread = useClusterUnread();
+  const spikeUnread = useSpikeUnread();
   // Depth cards and the searches read exchange labels/logos from the registry non-reactively;
   // this re-renders them when it changes (metadata arrival — rare).
   useExchangeRegistry((s) => s.version);
@@ -89,21 +103,24 @@ export const NotificationPanel = memo(function NotificationPanel({
   useEffect(() => {
     setDepthViewing(open && tab === 'depth');
     setTradesViewing(open && tab === 'trades');
+    setSpikesViewing(open && tab === 'spikes');
     // An open ladder hides the list, so clusters appearing meanwhile do count as unread.
     setClustersViewing(open && tab === 'clusters' && openCluster === null);
-  }, [open, tab, openCluster, setDepthViewing, setTradesViewing, setClustersViewing]);
+  }, [open, tab, openCluster, setDepthViewing, setTradesViewing, setSpikesViewing, setClustersViewing]);
   useEffect(
     () => () => {
       setDepthViewing(false);
       setTradesViewing(false);
+      setSpikesViewing(false);
       setClustersViewing(false);
     },
-    [setDepthViewing, setTradesViewing, setClustersViewing],
+    [setDepthViewing, setTradesViewing, setSpikesViewing, setClustersViewing],
   );
 
   const isDepth = tab === 'depth';
   const isTrades = tab === 'trades';
   const isClusters = tab === 'clusters';
+  const isSpikes = tab === 'spikes';
   const ladder = isClusters ? openCluster : null;
 
   // Newest-first ordering comes from the stores — no sort needed. Only the active tab's list
@@ -116,9 +133,23 @@ export const NotificationPanel = memo(function NotificationPanel({
   const visibleTrades = isTrades
     ? trades.filter((tr) => !isVenueMuted(tr, mutedTradeVenues) && matchesTrade(tr, query))
     : [];
-  const isEmpty = isTrades ? visibleTrades.length === 0 : visibleDepth.length === 0;
-  const canClear = isTrades ? trades.length > 0 : notifications.length > 0;
-  const clearLabel = isTrades ? t('panel.clearTrades') : t('panel.clearAll');
+  const visibleSpikes = isSpikes ? spikes.filter((sp) => matchesSpike(sp, query)) : [];
+  const isEmpty = isTrades
+    ? visibleTrades.length === 0
+    : isSpikes
+      ? visibleSpikes.length === 0
+      : visibleDepth.length === 0;
+  const canClear = isTrades
+    ? trades.length > 0
+    : isSpikes
+      ? spikes.length > 0
+      : notifications.length > 0;
+  const clearLabel = isTrades
+    ? t('panel.clearTrades')
+    : isSpikes
+      ? t('panel.clearSpikes')
+      : t('panel.clearAll');
+  const onClear = isTrades ? clearTrades : isSpikes ? clearSpikes : clearDepth;
 
   return (
     <aside
@@ -144,7 +175,7 @@ export const NotificationPanel = memo(function NotificationPanel({
           {!isClusters && (
             <button
               type="button"
-              onClick={isTrades ? clearTrades : clearDepth}
+              onClick={onClear}
               disabled={!canClear}
               title={clearLabel}
               aria-label={clearLabel}
@@ -220,6 +251,15 @@ export const NotificationPanel = memo(function NotificationPanel({
           title={t('panel.tabs.clustersTitle')}
           count={clusterUnread}
         />
+        <TabButton
+          id="notif-tab-spikes"
+          active={isSpikes}
+          onClick={() => onTabChange('spikes')}
+          icon={<SpikeIcon size={15} />}
+          label={t('panel.tabs.spikes')}
+          title={t('panel.tabs.spikesTitle')}
+          count={spikeUnread}
+        />
       </div>
 
       {ladder ? (
@@ -276,10 +316,16 @@ export const NotificationPanel = memo(function NotificationPanel({
               <ClusterList query={query} sizeMode={sizeMode} onOpen={setOpenCluster} />
             ) : isEmpty ? (
               <div className="py-7 text-center font-mono text-[12px] tracking-[0.04em] text-text-dim">
-                {isTrades ? t('panel.emptyTrades') : t('panel.empty')}
+                {isTrades
+                  ? t('panel.emptyTrades')
+                  : isSpikes
+                    ? t('panel.emptySpikes')
+                    : t('panel.empty')}
               </div>
             ) : isTrades ? (
               visibleTrades.map((tr) => <TradeCard key={tr.id} trade={tr} sizeMode={sizeMode} />)
+            ) : isSpikes ? (
+              visibleSpikes.map((sp) => <SpikeCard key={sp.id} spike={sp} />)
             ) : (
               visibleDepth.map((n) => (
                 <NotificationCard key={n.id} notification={n} sizeMode={sizeMode} />
@@ -295,7 +341,7 @@ export const NotificationPanel = memo(function NotificationPanel({
 /**
  * One tab: icon + label + unread chip (only when > 0; the active tab's count is always 0, see
  * the stores' `setViewing`). Tabs size to their content (`flex-auto`) rather than splitting
- * equally, and the label never wraps. Labels are short because three must fit the 340px panel;
+ * equally, and the label never wraps. Labels are short because four must fit the 340px panel;
  * `title` carries the full name.
  */
 function TabButton({

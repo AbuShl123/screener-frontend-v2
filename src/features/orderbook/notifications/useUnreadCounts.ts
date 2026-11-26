@@ -6,6 +6,7 @@ import {
 import { useNotificationSettingsStore } from '@/features/settings';
 import { useClusterStore } from '@/stores/clusterStore';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useSpikeStore } from '@/stores/spikeStore';
 import { useTradeStore } from '@/stores/tradeStore';
 
 /**
@@ -35,4 +36,13 @@ export function useClusterUnread(): number {
   const muted = useNotificationSettingsStore((s) => s.muted);
   const mutedVenues = useNotificationSettingsStore((s) => s.mutedVenues);
   return useClusterStore((s) => countUnreadClusters(s.active, s.unread, muted, mutedVenues));
+}
+
+/** Unread spike alerts. No Settings mute applies to spikes yet. */
+export function useSpikeUnread(): number {
+  return useSpikeStore((s) => {
+    let n = 0;
+    for (const a of s.spikes) if (a.seq > s.readSeq) n++;
+    return n;
+  });
 }
