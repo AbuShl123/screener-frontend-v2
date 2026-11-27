@@ -71,6 +71,18 @@
       "exceptional": "Исключительная"
     }
   },
+  "spike": {
+    "pump": "▲ РОСТ",
+    "dump": "▼ ПАДЕНИЕ",
+    "volume": "ОБЪЁМ",
+    "newVolume": "НОВЫЙ",
+    "window": "{{n}} мин",
+    "metric": {
+      "price": "ЦЕНА",
+      "volume": "ОБЪЁМ",
+      "window": "ОКНО"
+    }
+  },
   "cluster": {
     "open": "Открыть кластер {{symbol}} {{side}}",
     "back": "Все кластеры",
@@ -99,14 +111,19 @@
       "depthTitle": "Уведомления стакана",
       "tradesTitle": "Крупные сделки",
       "clusters": "Кластеры",
-      "clustersTitle": "Активные кластеры заявок"
+      "clustersTitle": "Активные кластеры заявок",
+      "spikes": "Всплески",
+      "spikesTitle": "Всплески цены и объёма"
     },
     "searchPlaceholder": "Поиск по тикеру, цене, объёму…",
     "empty": "Нет подходящих уведомлений",
     "emptyTrades": "Нет подходящих сделок",
     "openClusters": "Открыть кластеры заявок",
     "emptyClusters": "Нет активных кластеров",
-    "emptyClustersSearch": "Нет подходящих кластеров"
+    "emptyClustersSearch": "Нет подходящих кластеров",
+    "clearSpikes": "Очистить все всплески",
+    "openSpikes": "Открыть всплески цены и объёма",
+    "emptySpikes": "Нет подходящих всплесков"
   },
   "dashboard": {
     "reconnecting": "Переподключение к потоку…",

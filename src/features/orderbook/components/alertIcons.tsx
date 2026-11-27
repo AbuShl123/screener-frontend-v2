@@ -66,3 +66,24 @@ export function ClusterIcon({ size, strokeWidth = 2 }: { size: number; strokeWid
     </svg>
   );
 }
+
+/** A sharp jump in a line chart, for price and volume spikes. */
+export function SpikeIcon({ size, strokeWidth = 2 }: { size: number; strokeWidth?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="flex-none"
+    >
+      <path d="M3 17h4l3-4 3 2 4-11 4 13" />
+      <path d="M3 21h18" opacity="0.5" />
+    </svg>
+  );
+}

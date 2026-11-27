@@ -71,6 +71,18 @@
       "exceptional": "Exceptional"
     }
   },
+  "spike": {
+    "pump": "▲ PUMP",
+    "dump": "▼ DUMP",
+    "volume": "VOLUME",
+    "newVolume": "NEW",
+    "window": "{{n}}m",
+    "metric": {
+      "price": "PRICE",
+      "volume": "VOLUME",
+      "window": "WINDOW"
+    }
+  },
   "cluster": {
     "open": "Open the {{symbol}} {{side}} cluster",
     "back": "All clusters",
@@ -99,14 +111,19 @@
       "depthTitle": "Order book alerts",
       "tradesTitle": "Large trade alerts",
       "clusters": "Clusters",
-      "clustersTitle": "Active order clusters"
+      "clustersTitle": "Active order clusters",
+      "spikes": "Spikes",
+      "spikesTitle": "Price and volume spikes"
     },
     "searchPlaceholder": "Search ticker, price, size…",
     "empty": "No matching notifications",
     "emptyTrades": "No matching trade alerts",
     "openClusters": "Open order clusters",
     "emptyClusters": "No active clusters",
-    "emptyClustersSearch": "No matching clusters"
+    "emptyClustersSearch": "No matching clusters",
+    "clearSpikes": "Clear all spike alerts",
+    "openSpikes": "Open price and volume spikes",
+    "emptySpikes": "No matching spike alerts"
   },
   "dashboard": {
     "reconnecting": "Reconnecting to the feed…",

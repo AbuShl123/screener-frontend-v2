@@ -139,6 +139,10 @@ export function DashboardPage() {
     setNotifTab('clusters');
     setNotifOpen(true);
   }, []);
+  const openSpikeNotifications = useCallback(() => {
+    setNotifTab('spikes');
+    setNotifOpen(true);
+  }, []);
   const closeNotifications = useCallback(() => setNotifOpen(false), []);
 
   return (
@@ -207,6 +211,7 @@ export function DashboardPage() {
         onOpenDepth={openDepthNotifications}
         onOpenTrades={openTradeNotifications}
         onOpenClusters={openClusterNotifications}
+        onOpenSpikes={openSpikeNotifications}
       />
       <NotificationPanel
         open={notifOpen}

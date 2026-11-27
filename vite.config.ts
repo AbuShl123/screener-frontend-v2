@@ -12,6 +12,7 @@ const devMocks = (): Plugin => ({
   apply: 'serve',
   transformIndexHtml: () => [
     { tag: 'script', attrs: { type: 'module', src: '/src/dev/clusterMock.ts' }, injectTo: 'body' },
+    { tag: 'script', attrs: { type: 'module', src: '/src/dev/spikeMock.ts' }, injectTo: 'body' },
   ],
 });
 

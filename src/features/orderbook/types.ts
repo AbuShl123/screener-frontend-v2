@@ -143,6 +143,63 @@ export interface TradeAlert extends TradeData {
   seq: number;
 }
 
+/** A pump (`UP`) or a dump (`DOWN`) (doc §3.10). */
+export type SpikeDirection = 'UP' | 'DOWN';
+
+/** A `PRICE_SPIKE` envelope's `data` (doc §3.10): the price moved sharply within the window. */
+export interface PriceSpikeData {
+  id: string; // opaque, stable — the dedupe key
+  time: number; // exchange time of the candle update that raised it, epoch ms
+  direction: SpikeDirection;
+  pct: number; // signed percent, 2 dp: positive for UP, negative for DOWN
+  fromPrice: number; // the window's low (UP) or high (DOWN)
+  toPrice: number; // the current price
+  windowSec: number;
+}
+
+/** A `VOLUME_SPIKE` envelope's `data` (doc §3.10): traded volume jumped against the window before. */
+export interface VolumeSpikeData {
+  id: string;
+  time: number;
+  pct: number | null; // percent, 2 dp; null when prevVolume is 0 (an infinite increase)
+  prevVolume: number; // quote asset (USDT), previous window
+  volume: number; // quote asset (USDT), current window
+  windowSec: number;
+}
+
+/** A decoded `PRICE_SPIKE` envelope. An event, like `TRADE`: never updated or removed. */
+export interface PriceSpikeMessage {
+  type: 'PRICE_SPIKE';
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  data: PriceSpikeData;
+}
+
+/** A decoded `VOLUME_SPIKE` envelope. An event, like `TRADE`: never updated or removed. */
+export interface VolumeSpikeMessage {
+  type: 'VOLUME_SPIKE';
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  data: VolumeSpikeData;
+}
+
+export type SpikeMessage = PriceSpikeMessage | VolumeSpikeMessage;
+
+/** Instrument identity + the client-side arrival number shared by every stored spike. */
+interface StoredSpike {
+  exchange: Exchange;
+  market: Market;
+  symbol: string;
+  seq: number; // like `TradeAlert.seq`: 0 for snapshot replays (always read)
+}
+
+/** A stored spike: the envelope flattened, `kind` telling price from volume (`spikeStore`). */
+export type SpikeAlert =
+  | (StoredSpike & PriceSpikeData & { kind: 'PRICE' })
+  | (StoredSpike & VolumeSpikeData & { kind: 'VOLUME' });
+
 /** One level of a cluster's ladder, decoded from the wire's positional `[price, quantity]`. */
 export interface ClusterLevel {
   price: number;
@@ -219,10 +276,18 @@ export const clusterKey = (exchange: Exchange, symbol: string, market: Market): 
  *
  * A `SNAPSHOT`'s mixed entries are split by type at decode time: `data` is the depth state
  * (replaces the order book), `trades` the replayed recent alerts (merged by id, never counted
- * as unread), `clusters` the cluster state (replaces every instrument's clusters, never alerts).
+ * as unread), `clusters` the cluster state (replaces every instrument's clusters, never alerts),
+ * `spikes` the replayed recent spike alerts (merged by id like trades).
  */
 export type FeedMessage =
-  | { type: 'SNAPSHOT'; data: DepthMessage[]; trades: TradeMessage[]; clusters: ClusterMessage[] }
+  | {
+      type: 'SNAPSHOT';
+      data: DepthMessage[];
+      trades: TradeMessage[];
+      clusters: ClusterMessage[];
+      spikes: SpikeMessage[];
+    }
   | DepthMessage
   | TradeMessage
-  | ClusterMessage;
+  | ClusterMessage
+  | SpikeMessage;
